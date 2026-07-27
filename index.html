@@ -102,6 +102,28 @@ select.input{appearance:none; background-image:url("data:image/svg+xml,%3Csvg xm
   background:var(--bg2); color:var(--text); font-size:.9rem; cursor:pointer;
 }
 .chips button.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700}
+.chipsm{display:flex; flex-wrap:wrap; gap:8px}
+.chipsm button{
+  min-height:40px; padding:8px 14px; border-radius:999px; border:1px solid var(--line);
+  background:var(--bg2); color:var(--text); font-size:.9rem; cursor:pointer;
+}
+.chipsm button.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700}
+.stat{display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:.92rem}
+.stat:last-child{border-bottom:none}
+.stat b{font-weight:700}
+
+/* сегменти-питання (квіз оцінки ударів) */
+.qz-skill{margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--line)}
+.qz-skill:last-child{margin-bottom:0; padding-bottom:0; border-bottom:none}
+.qz-q{margin-bottom:12px}
+.qz-q p{margin:0 0 8px; font-weight:600; font-size:.9rem}
+.qzlist{display:flex; flex-direction:column; gap:6px}
+.qzlist button{
+  text-align:left; width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line);
+  background:var(--bg2); color:var(--text); font-size:.86rem; line-height:1.35; cursor:pointer;
+}
+.qzlist button.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700}
+.hint.ok{color:var(--ok); font-weight:700}
 
 /* ---------- Checklist ---------- */
 .check{display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); cursor:pointer}
@@ -342,6 +364,178 @@ const ALL_SKILLS = STROKES.concat(SERVES);
 const SURFACES = ["Хард","Ґрунт","Трава","Килим/зал","Інше"];
 function skillLabel(k){ const s = ALL_SKILLS.find(x=>x.k===k); return s? s.label : k; }
 
+/* ---------- Ракетка ---------- */
+const RACKET_GRIPS = [
+  {v:"L1", label:"L1 · 4″"}, {v:"L2", label:"L2 · 4⅛″"}, {v:"L3", label:"L3 · 4¼″"},
+  {v:"L4", label:"L4 · 4⅜″"}, {v:"L5", label:"L5 · 4½″"}
+];
+
+/* ---------- Рівень ↔ орієнтовний рейтинг ліги ---------- */
+const RATING_BY_LEVEL = {"2.0":400,"2.5":460,"3.0":520,"3.5":600,"4.0":700,"4.5":820,"5.0":950};
+
+/* ---------- Ігровий стиль і тенденції (для «Про свою гру») ---------- */
+const PLAYSTYLES = [
+  {v:"aggressive", label:"Агресивний бомбардир", desc:"Диктую темп, граю на випередження, завершую в 1–2 ударах"},
+  {v:"allcourt",   label:"Універсал (задня лінія + сітка)", desc:"Комфортно і глибоко, і біля сітки, люблю різноманітність"},
+  {v:"counter",    label:"Контратакувальник / ретрівер", desc:"Стабільний, багато повертаю, чекаю на помилку суперника"},
+  {v:"serve",      label:"Ставка на подачу", desc:"Головна зброя — перша подача і швидка атака після неї"}
+];
+const TENDENCY_TAGS = [
+  {v:"nervous_bp",  label:"Нервую на важливих очках (брейк-пойнти)"},
+  {v:"slow_start",  label:"Повільно розігріваюсь, краще граю в 2-му сеті"},
+  {v:"good_closer", label:"Добре закриваю матч, коли веду в рахунку"},
+  {v:"tight_lead",  label:"Затискаюсь при великому відриві в рахунку"},
+  {v:"fights_back", label:"Добре відіграюсь, коли програю"},
+  {v:"vs_pace",     label:"Важко проти сильного темпу суперника"},
+  {v:"vs_spin",     label:"Важко проти крученого/різаного м’яча"},
+  {v:"vs_pusher",   label:"Важко проти суперників, які просто повертають м’яч"},
+  {v:"unforced",    label:"Часто роблю невимушені помилки під тиском"}
+];
+
+/* ---------- Самопочуття: довідники ---------- */
+const INJURY_ZONES  = [{v:"knee",label:"Коліно"},{v:"back",label:"Спина"},{v:"shoulder",label:"Плече"},{v:"elbow",label:"Лікоть/зап’ясток"},{v:"ankle",label:"Гомілка/стопа"},{v:"none",label:"Немає"}];
+const MEDICAL_FLAGS = [{v:"asthma",label:"Астма/дихання"},{v:"heart",label:"Серце/тиск"},{v:"diabetes",label:"Діабет"},{v:"none",label:"Немає"}];
+const CRAMP_HISTORY = [{v:"never",label:"Ніколи"},{v:"heat",label:"Іноді в спеку"},{v:"often",label:"Часто"}];
+const FOOD_TAGS      = [{v:"gluten",label:"Глютен"},{v:"lactose",label:"Лактоза"},{v:"nuts",label:"Горіхи"},{v:"none",label:"Немає"}];
+const NERVES_LEVEL   = [{v:"low",label:"Спокійно"},{v:"mid",label:"Помірне хвилювання"},{v:"high",label:"Сильно хвилююсь"}];
+function racketInsight(p){
+  const r = p && p.racket; if(!r) return null;
+  const tips = [];
+  if(r.balance==="heavy") tips.push("важка в голові — використовуй природну потужність із задньої лінії");
+  else if(r.balance==="light") tips.push("легка в голові — краще реагуй на сітці й на швидкій подачі суперника");
+  if(r.pattern==="open") tips.push("рідке плетіння струн — тисни на потенціал обертання (топспін, кручена подача)");
+  else if(r.pattern==="dense") tips.push("щільне плетіння струн — тримайся контролю і пласких ударів у ключові моменти");
+  if(!tips.length) return null;
+  return {id:"pa.racket@1", txt:"Твоя ракетка: " + tips.join("; ") + "."};
+}
+
+/* ---------- Квіз-оцінка ударів (3 питання на удар, 1–5) ---------- */
+const SKILL_QUIZ = {
+  fh: [
+    {q:"Наскільки стабільно форхенд лишається в корті у звичайному розіграші?", opts:[
+      "Часто відправляю в сітку або за межі корту","Тримаю в грі, поки суперник не змусить бігати",
+      "Впевнено тримаю м’яч у грі на середньому темпі","Стабільний навіть у швидкому обміні ударами",
+      "Практично не роблю невимушених помилок"]},
+    {q:"Чи можеш направити форхенд туди, куди хочеш (по лінії/по діагоналі, глибоко/коротко)?", opts:[
+      "Просто намагаюсь перебити","Керую в загальних рисах (ліво/право)",
+      "Впевнено обираю напрямок і глибину","Точно ставлю в кут або в ноги суперника",
+      "Керую напрямком навіть під тиском і в русі"]},
+    {q:"Чи використовуєш форхенд, щоб атакувати й завершувати розіграш?", opts:[
+      "Граю обережно, аби не помилитись","Іноді прискорюю на зручному м’ячі",
+      "Регулярно завершую розіграш форхендом","Створюю атаку навіть із неідеальної позиції",
+      "Це моя головна зброя — суперники його уникають"]}
+  ],
+  bh: [
+    {q:"Наскільки стабільно бекхенд лишається в корті у звичайному розіграші?", opts:[
+      "Часто помиляюсь навіть на несильних м’ячах","Тримаю в грі при спокійному темпі",
+      "Стабільний на середньому темпі гри","Витримує швидкі й глибокі м’ячі",
+      "Майже не даю безкоштовних помилок"]},
+    {q:"Чи можеш керувати напрямком і глибиною бекхенду?", opts:[
+      "Просто перебиваю, куди вийде","Керую напрямком по діагоналі",
+      "Впевнено ставлю глибоко в потрібний кут","Точно міняю напрямок по лінії й по діагоналі",
+      "Керую навіть під тиском і в невигідній позиції"]},
+    {q:"Чи можеш атакувати бекхендом, а не лише захищатись?", opts:[
+      "Граю ним лише захисно","Іноді прискорюю на зручному м’ячі",
+      "Регулярно перехоплюю ініціативу бекхендом","Атакую навіть із глибини корту",
+      "Це один із моїх головних ударів для завершення"]}
+  ],
+  slice: [
+    {q:"Як часто різаний виходить керованим — низький, стабільний відскок?", opts:[
+      "Рідко виходить саме різаний — частіше пласкіший або в сітку","Виходить, коли граю повільно й обережно",
+      "Стабільно тримаю низький відскок у грі","Впевнено ріжу навіть у швидкому обміні",
+      "Різаний — надійна частина мого арсеналу в будь-якій ситуації"]},
+    {q:"Чи вмієш ним міняти ритм і висоту гри суперника?", opts:[
+      "Просто перебиваю м’яч","Іноді свідомо граю нижче, щоб збити ритм",
+      "Регулярно використовую, щоб не давати зручний м’яч","Точно направляю в незручну для суперника зону",
+      "Це моя тактична зброя — свідомо ламаю ритм гри"]},
+    {q:"Чи використовуєш різаний, щоб підготувати вихід до сітки або атаку?", opts:[
+      "Ні, граю ним лише щоб не програти очко","Іноді",
+      "Регулярно готую атаку різаним","Часто виходжу до сітки після різаного",
+      "Це стандартна частина моєї тактики"]}
+  ],
+  drop: [
+    {q:"Наскільки часто укорочений вдається (м’яч падає близько до сітки, суперник не встигає)?", opts:[
+      "Рідко виходить — часто в сітку або занадто довгий","Вдається зрідка, більше випадково",
+      "Вдається приблизно в половині випадків","Вдається стабільно з зручної позиції",
+      "Майже завжди застає суперника зненацька"]},
+    {q:"Чи вмієш маскувати підготовку до укороченого, щоб суперник не здогадався заздалегідь?", opts:[
+      "Ні, підготовка дуже помітна","Трохи маскую",
+      "Здебільшого не видаю намір","Добре приховую до останньої миті",
+      "Суперник ніколи не вгадує наперед"]},
+    {q:"Чи закриваєш сітку або завершуєш розіграш після укороченого?", opts:[
+      "Ні, зазвичай залишаюсь на задній лінії","Іноді підходжу",
+      "Зазвичай іду вперед і готовий завершити","Завжди йду вперед і часто забираю очко",
+      "Укорочений і вихід до сітки — відпрацьована зв’язка"]}
+  ],
+  smash: [
+    {q:"Наскільки надійно завершуєш прості свічки смешем?", opts:[
+      "Часто помиляюсь навіть на простих свічках","Влучаю на найпростіших м’ячах",
+      "Стабільно забиваю зручні свічки","Впевнено граю і складніші, з рухом",
+      "Майже завжди забиваю, навіть у складному положенні"]},
+    {q:"Чи добре рухаєшся під свічку (відхід назад, вибір позиції)?", opts:[
+      "Часто не встигаю зайняти позицію","Встигаю на повільних свічках",
+      "Впевнено відходжу і граю з місця","Добре рухаюсь навіть на глибокі свічки",
+      "Читаю свічку заздалегідь і завжди в позиції"]},
+    {q:"Чи можеш направити смеш у конкретну зону, а не просто «в корт»?", opts:[
+      "Просто намагаюсь потрапити в корт","Іноді ціляюсь у бік",
+      "Зазвичай направляю в порожню зону","Точно завершую в кут або в ноги",
+      "Контролюю напрямок навіть у складному стрибку"]}
+  ],
+  srvFlat: [
+    {q:"Який відсоток перших подач зазвичай влучає в корт?", opts:[
+      "Менше третини","Приблизно третина","Приблизно половина",
+      "Більшість перших подач влучає","Дуже стабільна, майже завжди в корт"]},
+    {q:"Чи можеш направити плоску подачу в конкретну зону (в тіло/у кут)?", opts:[
+      "Просто подаю, куди вийде","Загалом влучаю в половину майданчика",
+      "Впевнено ціляюсь у кут або в тіло","Точно міняю зону залежно від ситуації",
+      "Використовую напрямок як тактичну зброю на розрахунку"]},
+    {q:"Чи використовуєш плоску подачу, щоб одразу атакувати наступним ударом?", opts:[
+      "Ні, після подачі просто чекаю на прийом","Іноді виходить продовжити атаку",
+      "Регулярно атакую після вдалої подачі","Часто виграю очко в 1–2 ударах після подачі",
+      "Це стандартна зв’язка в моїй грі"]}
+  ],
+  srvSlice: [
+    {q:"Наскільки стабільно виходить саме різана подача (з боковим обертанням, а не пласка)?", opts:[
+      "Рідко виходить саме різана","Виходить зрідка",
+      "Стабільно виходить на першій подачі","Стабільно на першій і другій",
+      "Дуже надійна частина мого арсеналу"]},
+    {q:"Чи можеш відкрити корт різаною подачею (широко в кут)?", opts:[
+      "Ні, подаю здебільшого в центр","Іноді виходить широко",
+      "Регулярно відкриваю кут","Точно розтягую суперника за корт",
+      "Використовую системно для побудови розіграшу"]},
+    {q:"Чи використовуєш різану подачу, щоб розкрити корт під атаку наступним ударом?", opts:[
+      "Ні","Іноді","Регулярно",
+      "Часто завершую розіграш в 1–2 удари","Це відпрацьована тактична зв’язка"]}
+  ],
+  srvKick: [
+    {q:"Наскільки стабільно виходить кручена подача з високим відскоком?", opts:[
+      "Майже не виходить","Виходить зрідка","Стабільно на другій подачі",
+      "Стабільно і на першій, і на другій","Дуже надійна, високий відскок практично завжди"]},
+    {q:"Чи використовуєш кручену як безпечну другу подачу без подвійних помилок?", opts:[
+      "Часто подвійні помилки на другій подачі","Іноді помиляюсь",
+      "Рідко подвійні помилки","Майже ніколи не роблю подвійних",
+      "Друга подача — моя сильна сторона, надійність висока"]},
+    {q:"Чи направляєш кручену подачу в незручну для суперника зону (у бекхенд)?", opts:[
+      "Ні, просто намагаюсь потрапити в корт","Іноді ціляюсь у бекхенд",
+      "Регулярно направляю в бекхенд","Точно ставлю в зону, незручну для конкретного суперника",
+      "Системно будую розіграш через кручену в бекхенд"]}
+  ],
+  net: [
+    {q:"Наскільки надійні твої воллеї, коли ти вже на сітці?", opts:[
+      "Часто помиляюсь навіть на простих воллеях","Впевнено граю прості воллеї",
+      "Стабільно граю воллеї середньої складності","Впевнено граю і складні, низькі м’ячі",
+      "Дуже надійний на сітці, рідко помиляюсь"]},
+    {q:"Чи обираєш правильний момент, щоб вийти до сітки (не навмання)?", opts:[
+      "Рідко виходжу до сітки","Виходжу, коли є явно легкий м’яч",
+      "Виходжу на глибокий або атакувальний удар","Добре читаю момент для виходу",
+      "Системно будую розіграш із виходом до сітки"]},
+    {q:"Чи вмієш завершувати розіграш на сітці (воллей у відкриту зону)?", opts:[
+      "Часто просто повертаю м’яч у корт","Іноді завершую",
+      "Регулярно забираю очко з сітки","Впевнено ставлю у відкриту зону",
+      "Сітка — моя головна зброя для завершення розіграшу"]}
+  ]
+};
+
 /* ============================================================
    ГЕНЕРАТОРИ РЕКОМЕНДАЦІЙ (rule-based, MVP)
    Кожна порада має id для версіонування контенту.
@@ -384,6 +578,8 @@ function genHydration(p, t){
   }
   if(many) L.push({id:"hyd.many@1", txt:(t.expMax)+" і більше матчів: додай ізотонік і сплануй повноцінний перекус після 2-го матчу."});
   if(p && p.heatSensitive && t.court==="open") L.push({id:"hyd.sensitive@1", txt:"Ти позначив чутливість до спеки: кепка, тінь у кожній перерві, охолодження шиї/зап’ясть водою.", warn:true});
+  if(p && p.cramps==="often") L.push({id:"hyd.cramp.often@1", txt:"У тебе часто бувають судоми: додай електроліти/ізотонік навіть у прохолодну погоду, не чекай на спрагу.", warn:true});
+  else if(p && p.cramps==="heat" && heat) L.push({id:"hyd.cramp.heat@1", txt:"Судоми траплялись у спеку: сьогодні саме такі умови — електроліти з першого матчу, а не після появи симптомів.", warn:true});
   return L;
 }
 
@@ -401,6 +597,8 @@ function genChecklist(p, t){
   if(t.court==="open" && t.temp!=null && t.temp<15){ items.push("Вітровка/худі на перерви"); }
   if(t.surface==="Ґрунт"){ items.push("Друга пара шкарпеток (ґрунт) і щітка для взуття"); }
   if(t.balls){ items.push("Нотатка: м’ячі — " + t.balls + ". Придивись до відскоку на розминці."); }
+  if(p && (p.medical||[]).includes("asthma")) items.push("Інгалятор під рукою (позначено в профілі: астма/дихання)");
+  if(p && (p.injuryZones||[]).length && !p.injuryZones.includes("none")) items.push("Тейп/бандаж для проблемної зони: " + p.injuryZones.map(z=>({knee:"коліно",back:"спина",shoulder:"плече",elbow:"лікоть/зап’ясток",ankle:"гомілка/стопа"}[z]||z)).join(", "));
   items.push("Заряджений телефон + павербанк");
   return items;
 }
@@ -481,6 +679,15 @@ function genWarmup(p, t){
   const notes = [];
   if(heat) notes.push("У спеку: нижча інтенсивність, вода між блоками, розминайся в тіні, де можливо.");
   if(cold) notes.push("Прохолодно: довша загальна частина, не знімай кофту до тенісного блоку.");
+  const zones = (p && p.injuryZones)||[];
+  const zoneNotes = {
+    knee:"Коліно: без різких стрибків і зупинок, більше плавної активації, кроки замість ривків.",
+    back:"Спина: обережно з глибокими нахилами, додай м’яке скручування корпусу перед тенісним блоком.",
+    shoulder:"Плече: подача — з поступовим збільшенням амплітуди, без силового замаху на перших м’ячах.",
+    elbow:"Лікоть/зап’ясток: більше повторів у повітрі (тінь) перед контактом з м’ячем, без ривкових воллеїв одразу.",
+    ankle:"Гомілка/стопа: акуратно з бічними випадами й різкою зміною напрямку на початку."
+  };
+  zones.filter(z=>z!=="none").forEach(z=>{ if(zoneNotes[z]) notes.push(zoneNotes[z]); });
   return {blocks, notes};
 }
 
@@ -625,7 +832,7 @@ function renderTabbar(){
     + '<a href="'+planHref+'" class="'+(on("#/t/")&&(h.includes("/plan")||h.includes("/game"))||on("#/tnew")?"on":"")+'"><span class="ic">📋</span>План</a>'
     + '<a href="#/sos" class="sos" aria-label="Потрібна допомога зараз"><span class="bubble">SOS</span></a>'
     + '<a href="'+matchHref+'" class="'+(h.includes("/matches")||h.includes("/report")||on("#/newmatch")?"on":"")+'"><span class="ic">🎾</span>Матчі</a>'
-    + '<a href="#/profile" class="'+on("#/profile")+'"><span class="ic">👤</span>Профіль</a>'
+    + '<a href="#/profile" class="'+(on("#/profile")||on("#/profileedit")?"on":"")+'"><span class="ic">👤</span>Профіль</a>'
     + '</div>';
 }
 
@@ -636,6 +843,7 @@ function render(){
   renderTabbar();
   if(h===""||p[0]==="home") return scrHome();
   if(p[0]==="profile") return scrProfile();
+  if(p[0]==="profileedit") return scrProfileEdit();
   if(p[0]==="strengths") return scrStrengths();
   if(p[0]==="tnew") return scrTournForm(null);
   if(p[0]==="tedit") return scrTournForm(getT(p[1]));
@@ -666,6 +874,30 @@ function bindPickers(){
       const b = e.target.closest("button"); if(!b) return;
       g.dataset.value = b.dataset.v;
       $$("button",g).forEach(x=>x.classList.toggle("on", x===b));
+    };
+  });
+}
+/* --- Чіпи з мультивибором (кілька відповідей одразу) --- */
+function multiChipsInput(id, options, vals){
+  vals = vals||[];
+  return '<div class="chipsm" id="'+id+'" data-value="'+esc(vals.join(","))+'">' +
+    options.map(o=>'<button type="button" data-v="'+esc(o.v)+'" class="'+(vals.includes(o.v)?"on":"")+'">'+esc(o.label)+"</button>").join("") + "</div>";
+}
+function multiChipVal(id){ const el=$("#"+id); if(!el) return []; return (el.dataset.value||"").split(",").filter(Boolean); }
+function bindMultiChips(){
+  $$(".chipsm").forEach(g=>{
+    g.onclick = e=>{
+      const b = e.target.closest("button"); if(!b) return;
+      let cur = (g.dataset.value||"").split(",").filter(Boolean);
+      const v = b.dataset.v;
+      if(v==="none"){ cur = ["none"]; }
+      else{
+        cur = cur.filter(x=>x!=="none");
+        const i = cur.indexOf(v);
+        if(i>=0) cur.splice(i,1); else cur.push(v);
+      }
+      g.dataset.value = cur.join(",");
+      $$("button",g).forEach(x=>x.classList.toggle("on", cur.includes(x.dataset.v)));
     };
   });
 }
@@ -748,12 +980,108 @@ function scrHome(){
 /* ============================================================
    FR-01: ПРОФІЛЬ
    ============================================================ */
+function labelFor(arr, v){ const o=arr.find(x=>x.v===v); return o? o.label : v; }
+
+/* ---------- Роутер екрана профілю: перегляд або редагування ---------- */
 function scrProfile(){
+  if(!S.profile) return scrProfileEdit();
+  return scrProfileView();
+}
+
+/* ============================================================
+   FR-01a: ПЕРЕГЛЯД ПРОФІЛЮ (read-only + кнопка «Редагувати»)
+   ============================================================ */
+function scrProfileView(){
+  const p = S.profile;
+  setTop("Мій профіль", true);
+  const rk = p.racket||{};
+  const zoneLabels = {knee:"Коліно",back:"Спина",shoulder:"Плече",elbow:"Лікоть/зап’ясток",ankle:"Гомілка/стопа",none:"Немає"};
+  const medLabels = {asthma:"Астма/дихання",heart:"Серце/тиск",diabetes:"Діабет",none:"Немає"};
+  const foodLabels = {gluten:"Глютен",lactose:"Лактоза",nuts:"Горіхи",none:"Немає"};
+  const skillsList = ALL_SKILLS.map(s=>({label:s.label, v:(p.skills||{})[s.k]||0}));
+  $("#app").innerHTML =
+    '<div class="card"><h2>Основне</h2>' +
+      '<div class="stat"><span>Ім’я</span><b>'+esc(p.name||"—")+'</b></div>' +
+      '<div class="stat"><span>Вік</span><b>'+esc(p.age||"—")+'</b></div>' +
+      '<div class="stat"><span>Стать</span><b>'+esc(p.sex||"—")+'</b></div>' +
+      '<div class="stat"><span>Зріст / вага</span><b>'+esc(p.height||"—")+' см / '+esc(p.weight||"—")+' кг</b></div>' +
+      '<div class="stat"><span>Ігрова рука</span><b>'+(p.hand==="left"?"Ліва":p.hand==="right"?"Права":"—")+'</b></div>' +
+    "</div>" +
+
+    '<div class="card"><h2>Ракетка</h2>' +
+      (rk.weight||rk.headSize||rk.grip||rk.balance||rk.pattern ?
+        '<div class="stat"><span>Вага</span><b>'+(rk.weight?rk.weight+" г":"—")+'</b></div>' +
+        '<div class="stat"><span>Розмір голови</span><b>'+(rk.headSize?rk.headSize+" кв. дюймів":"—")+'</b></div>' +
+        '<div class="stat"><span>Ручка</span><b>'+esc(labelFor(RACKET_GRIPS, rk.grip)||"—")+'</b></div>' +
+        '<div class="stat"><span>Баланс</span><b>'+({light:"Легка в голові",even:"Збалансована",heavy:"Важка в голові"}[rk.balance]||"—")+'</b></div>' +
+        '<div class="stat"><span>Струни</span><b>'+({open:"Рідка (16×19)",dense:"Щільна (18×20)"}[rk.pattern]||"—")+'</b></div>'
+        : '<p class="muted small">Не вказано.</p>') +
+    "</div>" +
+
+    '<div class="card"><h2>Досвід і рівень</h2>' +
+      '<div class="stat"><span>Років у тенісі</span><b>'+esc(p.years||"—")+'</b></div>' +
+      '<div class="stat"><span>Граю зазвичай</span><b>'+esc(p.freq||"—")+'</b></div>' +
+      '<div class="stat"><span>Рівень (NTRP)</span><b>'+esc(p.level||"—")+'</b></div>' +
+      '<div class="stat"><span>Рейтинг у лізі</span><b>'+esc(p.rating||"—")+'</b></div>' +
+    "</div>" +
+
+    '<div class="card"><h2>Удари й подача</h2>' +
+      skillsList.map(s=>'<div class="stat"><span>'+esc(s.label)+'</span><b>'+(s.v? s.v+"/5" : "—")+'</b></div>').join("") +
+    "</div>" +
+
+    '<div class="card"><h2>Про свою гру</h2>' +
+      '<div class="stat"><span>Стиль</span><b>'+esc(labelFor(PLAYSTYLES, p.style)||"—")+'</b></div>' +
+      (p.tendencies&&p.tendencies.length? '<p class="muted small" style="margin-top:8px">'+p.tendencies.map(v=>esc(labelFor(TENDENCY_TAGS,v))).join(" · ")+"</p>" : "") +
+      (p.selfDesc? '<p class="muted small" style="margin-top:8px">«'+esc(p.selfDesc)+'»</p>' : "") +
+    "</div>" +
+
+    '<div class="card"><h2>Самопочуття</h2>' +
+      '<div class="stat"><span>Травми/обмеження</span><b>'+((p.injuryZones||[]).map(v=>zoneLabels[v]||v).join(", ")||"—")+'</b></div>' +
+      (p.injuries? '<p class="muted small">'+esc(p.injuries)+"</p>" : "") +
+      '<div class="stat"><span>Медичні застереження</span><b>'+((p.medical||[]).map(v=>medLabels[v]||v).join(", ")||"—")+'</b></div>' +
+      '<div class="stat"><span>Чутливість до спеки</span><b>'+(p.heatSensitive?"Так":"Ні")+'</b></div>' +
+      '<div class="stat"><span>Судоми</span><b>'+esc(labelFor(CRAMP_HISTORY, p.cramps)||"—")+'</b></div>' +
+      '<div class="stat"><span>Харчові обмеження</span><b>'+((p.foodTags||[]).map(v=>foodLabels[v]||v).join(", ")||"—")+'</b></div>' +
+      (p.foodNotes? '<p class="muted small">'+esc(p.foodNotes)+"</p>" : "") +
+      '<div class="stat"><span>Ранкова енергія</span><b>'+({low:"Низька",mid:"Середня",high:"Висока"}[p.morningEnergy]||"—")+'</b></div>' +
+      '<div class="stat"><span>Передматчеве хвилювання</span><b>'+esc(labelFor(NERVES_LEVEL, p.nerves)||"—")+'</b></div>' +
+    "</div>" +
+
+    '<button class="btn primary" id="editP">Редагувати профіль</button>' +
+    '<button class="btn ghost" style="margin-top:10px" id="goData">Мої дані та приватність</button>';
+
+  $("#editP").onclick = ()=>nav("#/profileedit");
+  $("#goData").onclick = ()=>nav("#/data");
+}
+
+/* ============================================================
+   FR-01: РЕДАГУВАННЯ ПРОФІЛЮ
+   ============================================================ */
+function scrProfileEdit(){
   const p = S.profile || {};
   const first = !S.profile;
-  setTop(first? "Створення профілю" : "Мій профіль", !first);
+  setTop(first? "Створення профілю" : "Редагування профілю", true);
   const sk = p.skills||{};
+  const rk = p.racket||{};
   const scale = '<div class="seglbl"><span>1 — поки не впевнено</span><span>5 — дуже впевнено</span></div>';
+  function quizCard(title, list){
+    return '<div class="card"><h2>'+title+' · за питаннями</h2><p class="muted small">Дай відповідь на 3 короткі питання по кожному удару — оцінку 1–5 система порахує сама.</p>' +
+      list.map(s=>{
+        const qs = SKILL_QUIZ[s.k]||[];
+        return '<div class="qz-skill"><h3>'+esc(s.label)+"</h3>" +
+          qs.map((q,qi)=>'<div class="qz-q" id="qz_'+s.k+'_'+qi+'"><p>'+esc(q.q)+'</p><div class="qzlist">' +
+            q.opts.map((o,oi)=>'<button type="button" data-sk="'+s.k+'" data-qi="'+qi+'" data-v="'+(oi+1)+'">'+esc(o)+"</button>").join("") +
+            "</div></div>").join("") +
+          '<p class="hint" id="qzres_'+s.k+'">Дай відповідь на всі 3 питання (0/3)</p>' +
+          "</div>";
+      }).join("") +
+    "</div>";
+  }
+  function manualCard(title, list){
+    return '<div class="card"><h2>'+title+' · вручну</h2><p class="muted small">Оціни впевненість — від цього будується твій План А.</p>' +
+      list.map(s=>'<div class="field"><label>'+s.label+"</label>"+segInput("sk_"+s.k, sk[s.k])+scale+"</div>").join("") +
+    "</div>";
+  }
   $("#app").innerHTML =
     (first? '<div class="progress"><i style="width:50%"></i></div><p class="muted" style="margin-top:-8px">Крок 1 з 2 · Це займе ~2 хвилини. Усе можна змінити пізніше.</p>' : "") +
 
@@ -768,6 +1096,22 @@ function scrProfile(){
       "</div>" +
       '<div class="field"><label>Ігрова рука</label>'+chipsInput("f_hand",[{v:"right",label:"Права"},{v:"left",label:"Ліва"}],p.hand)+"</div>" +
       '<p class="hint" id="ageHint" style="display:none;color:var(--warn)">Застосунок розрахований на гравців від 14 років. Для молодших потрібна згода дорослого.</p>' +
+    "</div>" +
+
+    '<div class="card"><h2>Ракетка <span class="badge">опційно</span></h2>' +
+      '<p class="muted small">Впливає на поради з тактики: потужність, маневреність на сітці, потенціал обертання.</p>' +
+      '<div class="grid2">' +
+        '<div class="field"><label>Вага, г</label><input class="input" id="rk_weight" type="number" min="200" max="400" inputmode="numeric" value="'+esc(rk.weight)+'" placeholder="напр., 300">' +
+          '<div class="hint">Важча — більше стабільності й потужності; легша — швидша рука.</div></div>' +
+        '<div class="field"><label>Розмір голови, кв. дюйми</label><input class="input" id="rk_head" type="number" min="85" max="140" inputmode="numeric" value="'+esc(rk.headSize)+'" placeholder="напр., 100">' +
+          '<div class="hint">Більша площа — більший світ-спот і прощення помилок; менша — точніший контроль.</div></div>' +
+      "</div>" +
+      '<div class="field"><label>Розмір ручки (grip)</label>'+chipsInput("rk_grip", RACKET_GRIPS, rk.grip)+
+        '<div class="hint">Невідповідний розмір — часта причина втоми в лікті/зап’ясті.</div></div>' +
+      '<div class="field"><label>Баланс</label>'+chipsInput("rk_balance",[{v:"light",label:"Легка в голові"},{v:"even",label:"Збалансована"},{v:"heavy",label:"Важка в голові"}],rk.balance)+
+        '<div class="hint">Легка в голові — швидше реагуєш на сітці й подачі; важка — більше природної потужності з задньої лінії.</div></div>' +
+      '<div class="field"><label>Струнна схема</label>'+chipsInput("rk_pattern",[{v:"open",label:"Рідка (16×19)"},{v:"dense",label:"Щільна (18×20)"}],rk.pattern)+
+        '<div class="hint">Рідка — більше обертання (топспін, кручена подача); щільна — більше контролю на пласких ударах.</div></div>' +
     "</div>" +
 
     '<div class="card"><h2>Досвід і рівень</h2>' +
@@ -786,29 +1130,47 @@ function scrProfile(){
           "<b>4.0</b> — впевнені удари, будую розіграш, стабільна перша подача.<br>" +
           "<b>4.5–5.0</b> — граю силою/обертанням свідомо, читаю гру суперника.</div>" +
       "</div>" +
-      '<div class="field"><label>Рейтинг у своїй лізі (опційно, напр. 400–1000)</label><input class="input" id="f_rating" inputmode="numeric" value="'+esc(p.rating)+'" placeholder="напр., 650"></div>' +
+      '<div class="field"><label>Рейтинг у своїй лізі (опційно, напр. 400–1000)</label><input class="input" id="f_rating" inputmode="numeric" value="'+esc(p.rating)+'" placeholder="напр., 650">' +
+        '<div class="hint">Підтягується орієнтовно з обраного рівня NTRP — постав своє значення, якщо знаєш точніше.</div>' +
+        '<button type="button" class="btn ghost sm" id="syncRating" style="margin-top:8px">Підставити з рівня</button></div>' +
     "</div>" +
 
-    '<div class="card"><h2>Удари</h2><p class="muted small">Оціни впевненість — від цього будується твій План А.</p>' +
-      STROKES.map(s=>'<div class="field"><label>'+s.label+"</label>"+segInput("sk_"+s.k, sk[s.k])+scale+"</div>").join("") +
+    '<div class="card"><h2>Удари й подача</h2>' +
+      '<p class="muted small">Обери спосіб оцінки. Від цього будується твій План А.</p>' +
+      '<div class="chips" id="skillMode">' +
+        '<button type="button" data-v="manual" class="on">Я знаю свій рівень</button>' +
+        '<button type="button" data-v="quiz">Визначити через запитання</button>' +
+      "</div>" +
     "</div>" +
-
-    '<div class="card"><h2>Подача й сітка</h2>' +
-      SERVES.map(s=>'<div class="field"><label>'+s.label+"</label>"+segInput("sk_"+s.k, sk[s.k])+scale+"</div>").join("") +
-    "</div>" +
+    '<div id="skillsManual">' + manualCard("Удари", STROKES) + manualCard("Подача й сітка", SERVES) + "</div>" +
+    '<div id="skillsQuiz" style="display:none">' + quizCard("Удари", STROKES) + quizCard("Подача й сітка", SERVES) + "</div>" +
 
     '<div class="card"><h2>Про свою гру</h2>' +
-      '<div class="field"><label>Сильні сторони, улюблений темп, типові труднощі</label>' +
+      '<div class="field"><label>Ігровий стиль</label>' +
+        chipsInput("f_style", PLAYSTYLES, p.style) +
+        '<p class="hint" id="styleDesc">'+esc((PLAYSTYLES.find(x=>x.v===p.style)||{}).desc||"")+"</p></div>" +
+      '<div class="field"><label>Що з цього про тебе (можна кілька)</label>'+multiChipsInput("f_tendency", TENDENCY_TAGS, p.tendencies)+"</div>" +
+      '<div class="field"><label>Розгорнутий опис (опційно)</label>' +
       '<textarea class="input" id="f_desc" maxlength="500" placeholder="Напр.: люблю грати від форхенду в високому темпі; важко проти різаних низьких; у нервах поспішаю.">'+esc(p.selfDesc)+"</textarea>" +
-      '<div class="hint"><span id="descCnt">0</span>/500</div></div>' +
+      '<div class="hint"><span id="descCnt">0</span>/500 · ці дані знадобляться для майбутнього ШІ-аналізу твоєї гри</div></div>' +
     "</div>" +
 
     '<div class="card"><h2>Самопочуття <span class="badge">опційно</span></h2>' +
-      '<p class="muted small">Використовується лише щоб не радити тобі небезпечного.</p>' +
-      '<div class="field"><label>Травми чи обмеження</label><input class="input" id="f_inj" maxlength="200" value="'+esc(p.injuries)+'" placeholder="напр., коліно — без різких стрибків"></div>' +
-      '<div class="field"><label>Чутливість до спеки</label>'+chipsInput("f_heat",[{v:"no",label:"Ні"},{v:"yes",label:"Так, важко у спеку"}],p.heatSensitive?"yes":(p.heatSensitive===false?"no":""))+"</div>" +
-      '<div class="field"><label>Обмеження в харчуванні / алергії</label><input class="input" id="f_food" maxlength="200" value="'+esc(p.foodNotes)+'"></div>' +
+      '<p class="muted small">Впливає на графік дня, розминку, план гідратації та поради на SOS-кнопці. Це не медична консультація.</p>' +
+      '<div class="field"><label>Травми чи обмеження (можна кілька)</label>'+multiChipsInput("f_injzones", INJURY_ZONES, p.injuryZones)+
+        '<div class="hint">Впливає на розминку: під позначену зону додається обережніший блок вправ.</div></div>' +
+      '<div class="field"><input class="input" id="f_inj" maxlength="200" value="'+esc(p.injuries)+'" placeholder="Деталі (напр., коліно — без різких стрибків)"></div>' +
+      '<div class="field"><label>Медичні застереження (можна кілька)</label>'+multiChipsInput("f_medical", MEDICAL_FLAGS, p.medical)+
+        '<div class="hint">Використовується лише для обережних порад (напр., нагадування про інгалятор у чеклісті).</div></div>' +
+      '<div class="field"><label>Чутливість до спеки</label>'+chipsInput("f_heat",[{v:"no",label:"Ні"},{v:"yes",label:"Так, важко у спеку"}],p.heatSensitive?"yes":(p.heatSensitive===false?"no":""))+
+        '<div class="hint">У спекотні дні додає нижчу інтенсивність розминки й окремі нагадування про тінь.</div></div>' +
+      '<div class="field"><label>Судоми під час гри</label>'+chipsInput("f_cramps", CRAMP_HISTORY, p.cramps)+
+        '<div class="hint">«Часто» — електроліти закладаються в план гідратації навіть у прохолодну погоду.</div></div>' +
+      '<div class="field"><label>Харчові обмеження / алергії (можна кілька)</label>'+multiChipsInput("f_foodtags", FOOD_TAGS, p.foodTags)+"</div>" +
+      '<div class="field"><input class="input" id="f_food" maxlength="200" value="'+esc(p.foodNotes)+'" placeholder="Деталі, якщо потрібно (напр., ГЕРХ)"></div>' +
       '<div class="field"><label>Ранкова енергія (для ранніх матчів)</label>'+chipsInput("f_morning",[{v:"low",label:"Низька"},{v:"mid",label:"Середня"},{v:"high",label:"Висока"}],p.morningEnergy)+"</div>" +
+      '<div class="field"><label>Передматчеве хвилювання</label>'+chipsInput("f_nerves", NERVES_LEVEL, p.nerves)+
+        '<div class="hint">Впливає на мікроцілі й підказки на SOS-кнопці в напружені моменти.</div></div>' +
     "</div>" +
 
     '<button class="btn primary" id="saveP">'+(first?"Зберегти профіль →":"Зберегти зміни")+"</button>" +
@@ -816,26 +1178,78 @@ function scrProfile(){
     '<p class="notice">Профіль можна редагувати будь-коли.</p>';
 
   bindPickers();
+  bindMultiChips();
   const descEl = $("#f_desc"), cnt = $("#descCnt");
   const updCnt = ()=>cnt.textContent = descEl.value.length; updCnt(); descEl.oninput = updCnt;
   $("#lvlHelp").onclick = ()=>{ const b=$("#lvlBox"); b.style.display = b.style.display==="none"?"block":"none"; };
   $("#f_age").oninput = ()=>{ $("#ageHint").style.display = (+$("#f_age").value>0 && +$("#f_age").value<14)? "block":"none"; };
   const gd = $("#goData"); if(gd) gd.onclick=()=>nav("#/data");
 
+  const ratingInput = $("#f_rating");
+  function applyLevelRating(force){
+    const lvl = val("f_level");
+    const sugg = RATING_BY_LEVEL[lvl];
+    if(sugg && (force || !ratingInput.value)) ratingInput.value = sugg;
+  }
+  $("#f_level").onchange = ()=>applyLevelRating(false);
+  $("#syncRating").onclick = ()=>applyLevelRating(true);
+
+  const styleGroup = $("#f_style");
+  styleGroup.addEventListener("click", ()=>{
+    const v = chipVal("f_style");
+    $("#styleDesc").textContent = (PLAYSTYLES.find(x=>x.v===v)||{}).desc||"";
+  });
+
+  /* --- Оцінка ударів: спільний draft для ручного і квіз-режимів --- */
+  let draftSkills = Object.assign({}, sk);
+  let quizAnswers = {};
+  ALL_SKILLS.forEach(s=>{
+    const g = $("#sk_"+s.k);
+    if(g) g.addEventListener("click", ()=>{ const v=segVal("sk_"+s.k); if(v) draftSkills[s.k]=v; });
+  });
+  $("#skillMode").onclick = e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    const mode = b.dataset.v;
+    $$("#skillMode button").forEach(x=>x.classList.toggle("on", x===b));
+    $("#skillsManual").style.display = mode==="manual"? "block":"none";
+    $("#skillsQuiz").style.display = mode==="quiz"? "block":"none";
+  };
+  $("#skillsQuiz").addEventListener("click", e=>{
+    const b = e.target.closest("button[data-sk]"); if(!b) return;
+    const skk = b.dataset.sk, qi = +b.dataset.qi, v = +b.dataset.v;
+    $$("button", $("#qz_"+skk+"_"+qi)).forEach(x=>x.classList.toggle("on", x===b));
+    quizAnswers[skk] = quizAnswers[skk] || [null,null,null];
+    quizAnswers[skk][qi] = v;
+    const ans = quizAnswers[skk];
+    const answered = ans.filter(x=>x!=null).length;
+    const res = $("#qzres_"+skk);
+    if(answered===3){
+      const score = Math.min(5, Math.max(1, Math.round(ans.reduce((a,c)=>a+c,0)/3)));
+      draftSkills[skk] = score;
+      res.textContent = "Оцінка з відповідей: "+score+"/5"; res.classList.add("ok");
+    } else {
+      res.classList.remove("ok");
+      res.textContent = "Дай відповідь на всі 3 питання ("+answered+"/3)";
+    }
+  });
+
   $("#saveP").onclick = ()=>{
-    const skills = {};
-    ALL_SKILLS.forEach(s=>{ const v=segVal("sk_"+s.k); if(v) skills[s.k]=v; });
-    if(!Object.keys(skills).length){ toast("Оціни хоча б один удар — без цього не побудувати План А"); return; }
+    if(!Object.keys(draftSkills).length){ toast("Оціни хоча б один удар — без цього не побудувати План А"); return; }
     const firstSave = !S.profile;
     S.profile = {
       name:val("f_name"), age:num("f_age"), sex:val("f_sex"), height:num("f_h"), weight:num("f_w"),
       hand:chipVal("f_hand")||"", years:num("f_years"), freq:val("f_freq"), level:val("f_level"), rating:val("f_rating"),
-      skills, selfDesc:val("f_desc"),
-      injuries:val("f_inj"), heatSensitive:chipVal("f_heat")==="yes", foodNotes:val("f_food"),
-      morningEnergy:chipVal("f_morning")||""
+      racket:{ weight:num("rk_weight"), headSize:num("rk_head"), grip:chipVal("rk_grip")||"", balance:chipVal("rk_balance")||"", pattern:chipVal("rk_pattern")||"" },
+      skills: draftSkills,
+      style: chipVal("f_style")||"", tendencies: multiChipVal("f_tendency"), selfDesc:val("f_desc"),
+      injuryZones: multiChipVal("f_injzones"), injuries:val("f_inj"),
+      medical: multiChipVal("f_medical"),
+      heatSensitive:chipVal("f_heat")==="yes", cramps:chipVal("f_cramps")||"",
+      foodTags: multiChipVal("f_foodtags"), foodNotes:val("f_food"),
+      morningEnergy:chipVal("f_morning")||"", nerves:chipVal("f_nerves")||""
     };
     save(); toast("Профіль збережено");
-    nav(firstSave? "#/strengths" : "#/home");
+    nav(firstSave? "#/strengths" : "#/profile");
   };
 }
 
@@ -854,7 +1268,7 @@ function scrStrengths(){
     '<button class="btn primary" id="ok">Усе так, продовжити</button>' +
     '<button class="btn ghost" style="margin-top:10px" id="fix">Виправити оцінки</button>';
   $("#ok").onclick = ()=>nav("#/home");
-  $("#fix").onclick = ()=>nav("#/profile");
+  $("#fix").onclick = ()=>nav("#/profileedit");
 }
 
 /* ============================================================
@@ -995,9 +1409,10 @@ function tabGame(t, el){
   const p = S.profile;
   const A = genPlanA(p), B = genPlanB(p,t), MG = genMicroGoals(p);
   const W = genWarmup(p,t);
+  const rkTip = racketInsight(p);
   let html =
     '<div class="card accent"><h2>🅰️ План А — твоя гра</h2><p class="muted small">Від ударів, у яких ти впевнений'+(S.profile&&S.profile.name?", "+esc(S.profile.name):"")+".</p><ul class=\"clean\">" +
-    A.map(x=>"<li>"+esc(x.txt)+"</li>").join("") + "</ul></div>" +
+    A.map(x=>"<li>"+esc(x.txt)+"</li>").join("") + (rkTip? "<li>"+esc(rkTip.txt)+"</li>" : "") + "</ul></div>" +
 
     '<div class="card"><h2>🅱️ План Б — якщо не йде</h2><p class="muted small">Коли План А не приносить очок 3–4 гейми поспіль.</p><ul class="clean">' +
     B.map(x=>"<li>"+esc(x.txt)+"</li>").join("") + "</ul></div>" +
