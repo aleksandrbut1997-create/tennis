@@ -1,0 +1,16 @@
+{
+  "name": "Персональний Тренер",
+  "short_name": "Тренер",
+  "description": "Помічник для підготовки, гри та аналізу аматорських тенісних турнірів",
+  "lang": "uk",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0D1220",
+  "theme_color": "#0D1220",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

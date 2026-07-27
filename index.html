@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0D1220">
+<meta name="description" content="Персональний Тренер — помічник для підготовки, гри та аналізу аматорських тенісних турнірів">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Тренер">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Персональний Тренер</title>
+<style>
+:root{
+  --bg:#0D1220; --bg2:#0A0F1A; --card:#171F31; --card2:#1E2840; --line:rgba(255,255,255,.09);
+  --text:#EEF2F9; --muted:#949EB4; --accent:#CDF463; --accent-ink:#17210A;
+  --danger:#FF6B6B; --danger-bg:#3A1B22; --ok:#57D9A3; --warn:#FFC65C;
+  --r:16px; --tap:48px;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  line-height:1.45; min-height:100vh;
+}
+#shell{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; background:var(--bg)}
+@media(min-width:560px){ #shell{border-left:1px solid var(--line); border-right:1px solid var(--line)} }
+
+/* ---------- Top bar ---------- */
+.topbar{
+  position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:8px;
+  padding:calc(10px + var(--sat)) 14px 10px; background:rgba(13,18,32,.92);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
+  min-height:calc(56px + var(--sat));
+}
+.topbar h1{font-size:1.1rem; margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.backbtn{
+  width:40px; height:40px; border-radius:12px; border:1px solid var(--line); background:var(--card);
+  color:var(--text); font-size:1.2rem; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
+}
+.topbar .spacer{width:40px; flex:none}
+
+/* ---------- Layout ---------- */
+#app{flex:1; padding:16px 16px calc(96px + var(--sab)); animation:fadein .18s ease}
+@keyframes fadein{from{opacity:.4; transform:translateY(4px)}to{opacity:1; transform:none}}
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:16px; margin-bottom:12px}
+.card.accent{background:linear-gradient(135deg,#232F14,#171F31 65%); border-color:rgba(205,244,99,.35)}
+.card.danger{background:var(--danger-bg); border-color:rgba(255,107,107,.4)}
+.card h2{font-size:1.05rem; margin:0 0 8px}
+.card h3{font-size:.95rem; margin:14px 0 6px; color:var(--accent)}
+.muted{color:var(--muted); font-size:.88rem}
+.small{font-size:.82rem}
+.center{text-align:center}
+.row{display:flex; gap:10px; align-items:center}
+.row>.grow{flex:1}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+hr.sep{border:none; border-top:1px solid var(--line); margin:14px 0}
+
+/* ---------- Buttons ---------- */
+.btn{
+  display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+  min-height:var(--tap); padding:12px 16px; border-radius:14px; border:1px solid transparent;
+  font-size:1rem; font-weight:600; cursor:pointer; color:var(--text); background:var(--card2);
+  transition:transform .05s ease, filter .15s;
+}
+.btn:active{transform:scale(.985)}
+.btn.primary{background:var(--accent); color:var(--accent-ink)}
+.btn.ghost{background:transparent; border-color:var(--line)}
+.btn.danger{background:var(--danger); color:#2A0B0B}
+.btn.outline-danger{background:transparent; border-color:var(--danger); color:var(--danger)}
+.btn.sm{min-height:40px; padding:8px 12px; font-size:.9rem; width:auto}
+.btn:disabled{opacity:.45; cursor:default}
+.btnrow{display:flex; gap:10px; margin-top:12px}
+.btnrow .btn{flex:1}
+
+/* ---------- Forms ---------- */
+.field{margin-bottom:14px}
+.field label{display:block; font-size:.86rem; color:var(--muted); margin-bottom:6px; font-weight:600}
+.input,select.input,textarea.input{
+  width:100%; min-height:var(--tap); padding:12px 14px; border-radius:12px;
+  border:1px solid var(--line); background:var(--bg2); color:var(--text); font-size:1rem; font-family:inherit;
+}
+textarea.input{min-height:88px; resize:vertical}
+.input:focus{outline:2px solid var(--accent); outline-offset:0; border-color:transparent}
+select.input{appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%23949EB4' stroke-width='2' fill='none'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center}
+.hint{font-size:.78rem; color:var(--muted); margin-top:4px}
+
+/* сегменти 1-5 та чіпи */
+.seg{display:flex; gap:6px}
+.seg button{
+  flex:1; min-height:44px; border-radius:10px; border:1px solid var(--line); background:var(--bg2);
+  color:var(--muted); font-size:1rem; font-weight:700; cursor:pointer;
+}
+.seg button.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.seglbl{display:flex; justify-content:space-between; font-size:.72rem; color:var(--muted); margin-top:4px}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chips button{
+  min-height:40px; padding:8px 14px; border-radius:999px; border:1px solid var(--line);
+  background:var(--bg2); color:var(--text); font-size:.9rem; cursor:pointer;
+}
+.chips button.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700}
+
+/* ---------- Checklist ---------- */
+.check{display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); cursor:pointer}
+.check:last-child{border-bottom:none}
+.check .box{
+  width:26px; height:26px; border-radius:8px; border:2px solid var(--muted); flex:none; margin-top:1px;
+  display:flex; align-items:center; justify-content:center; font-size:.9rem; color:var(--accent-ink);
+}
+.check.on .box{background:var(--accent); border-color:var(--accent)}
+.check.on .txt{color:var(--muted); text-decoration:line-through}
+
+/* ---------- Timeline ---------- */
+.tl{position:relative; padding-left:26px}
+.tl::before{content:""; position:absolute; left:9px; top:6px; bottom:6px; width:2px; background:var(--line)}
+.tl .item{position:relative; padding:8px 0 8px 6px}
+.tl .item::before{content:""; position:absolute; left:-23px; top:14px; width:12px; height:12px; border-radius:50%; background:var(--card2); border:2px solid var(--muted)}
+.tl .item.hot::before{background:var(--accent); border-color:var(--accent)}
+.tl .time{font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums}
+.tl .what{font-weight:600}
+.tl .note{font-size:.84rem; color:var(--muted)}
+
+/* ---------- Tabs (у турнірі) ---------- */
+.tabs{display:flex; gap:6px; margin-bottom:14px; overflow-x:auto; scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{
+  flex:1; min-height:42px; padding:8px 12px; white-space:nowrap; border-radius:12px;
+  border:1px solid var(--line); background:var(--card); color:var(--muted); font-weight:600; font-size:.9rem; cursor:pointer;
+}
+.tabs button.on{background:var(--card2); color:var(--text); border-color:var(--accent)}
+
+/* ---------- Нижня навігація ---------- */
+.tabbar{
+  position:fixed; bottom:0; left:0; right:0; z-index:30;
+  display:flex; justify-content:center;
+}
+.tabbar .inner{
+  width:100%; max-width:520px; display:flex; align-items:stretch;
+  background:rgba(10,15,26,.96); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  border-top:1px solid var(--line); padding:6px 4px calc(6px + var(--sab));
+}
+.tabbar a{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px;
+  color:var(--muted); text-decoration:none; font-size:.68rem; font-weight:600; min-height:52px; justify-content:center;
+}
+.tabbar a.on{color:var(--accent)}
+.tabbar a .ic{font-size:1.35rem; line-height:1}
+.tabbar a.sos{
+  margin-top:-22px; flex:none; width:76px;
+}
+.tabbar a.sos .bubble{
+  width:60px; height:60px; border-radius:50%; background:var(--danger); color:#fff;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-weight:800; font-size:.82rem; box-shadow:0 4px 18px rgba(255,107,107,.45); border:3px solid var(--bg2);
+}
+
+/* ---------- Інше ---------- */
+.badge{display:inline-block; padding:3px 10px; border-radius:999px; font-size:.74rem; font-weight:700; background:var(--card2); color:var(--muted)}
+.badge.ok{background:rgba(87,217,163,.15); color:var(--ok)}
+.badge.warn{background:rgba(255,198,92,.15); color:var(--warn)}
+.badge.red{background:rgba(255,107,107,.15); color:var(--danger)}
+.badge.lime{background:rgba(205,244,99,.16); color:var(--accent)}
+.bigicon{font-size:2.6rem; line-height:1; margin-bottom:8px}
+.matchcard{display:flex; align-items:center; gap:12px}
+.matchcard .score{font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums}
+.wl{width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:800; flex:none}
+.wl.w{background:rgba(87,217,163,.18); color:var(--ok)}
+.wl.l{background:rgba(255,107,107,.15); color:var(--danger)}
+.toast{
+  position:fixed; left:50%; bottom:calc(104px + var(--sab)); transform:translateX(-50%);
+  background:var(--card2); border:1px solid var(--line); color:var(--text);
+  padding:10px 18px; border-radius:999px; font-size:.9rem; z-index:60; box-shadow:0 6px 24px rgba(0,0,0,.4);
+  opacity:0; transition:opacity .2s; pointer-events:none; max-width:90%;
+}
+.toast.show{opacity:1}
+.sosbtns .btn{margin-bottom:10px; min-height:64px; font-size:1.05rem; justify-content:flex-start; text-align:left}
+.sosbtns .btn .ic{font-size:1.5rem}
+.progress{height:6px; background:var(--card2); border-radius:99px; overflow:hidden; margin:8px 0 16px}
+.progress i{display:block; height:100%; background:var(--accent); border-radius:99px; transition:width .2s}
+.notice{font-size:.78rem; color:var(--muted); padding:10px 4px; text-align:center}
+ul.clean{margin:6px 0; padding-left:20px}
+ul.clean li{margin-bottom:6px}
+.kv{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--line); font-size:.92rem}
+.kv:last-child{border-bottom:none}
+.kv b{font-variant-numeric:tabular-nums}
+
+/* ---------- Друк звіту ---------- */
+.printonly{display:none}
+@media print{
+  .printonly{display:block}
+  body{background:#fff; color:#111}
+  .topbar,.tabbar,.noprint{display:none !important}
+  #app{padding:0}
+  .card{border:1px solid #ddd; background:#fff; break-inside:avoid}
+  .card h3{color:#333}
+  .muted,.tl .note{color:#555}
+  .tl .time{color:#111}
+}
+</style>
+</head>
+<body>
+<div id="shell">
+  <div class="topbar" id="topbar"></div>
+  <div id="app"></div>
+</div>
+<nav class="tabbar" id="tabbar"></nav>
+<div class="toast" id="toast" role="status"></div>
+<noscript><p style="padding:20px">Для роботи застосунку потрібен увімкнений JavaScript.</p></noscript>
+<script>
+"use strict";
+/* ============================================================
+   Персональний Тренер — MVP (mobile-first, offline, локальні дані)
+   Дані зберігаються лише на пристрої (localStorage).
+   ============================================================ */
+
+/* ---------- Сховище ---------- */
+const KEY = "pt_v1";
+let S = load();
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){ const d = JSON.parse(raw); if(d && d.v===1) return d; }
+  }catch(e){}
+  return { v:1, profile:null, tournaments:[], sosLog:[] };
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Не вдалося зберегти дані"); } }
+
+/* ---------- Утиліти ---------- */
+const $ = (sel,root)=> (root||document).querySelector(sel);
+const $$ = (sel,root)=> Array.from((root||document).querySelectorAll(sel));
+const uid = ()=> Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function t2m(t){ if(!t) return null; const p=t.split(":"); return (+p[0])*60+(+p[1]||0); }
+function m2t(m){ m=((m%1440)+1440)%1440; const h=Math.floor(m/60), mm=m%60; return String(h).padStart(2,"0")+":"+String(mm).padStart(2,"0"); }
+function fmtDate(iso){
+  if(!iso) return "";
+  const d = new Date(iso+"T12:00:00");
+  return d.toLocaleDateString("uk-UA",{weekday:"short", day:"numeric", month:"long"});
+}
+function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function avg(arr){ const a=arr.filter(x=>typeof x==="number"&&!isNaN(x)); return a.length? a.reduce((s,x)=>s+x,0)/a.length : null; }
+function r1(x){ return x==null? "—" : (Math.round(x*10)/10).toString().replace(".",","); }
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._x); toast._x = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+function nav(h){ location.hash = h; }
+function getT(id){ return S.tournaments.find(t=>t.id===id) || null; }
+function activeT(){
+  const open = S.tournaments.filter(t=>t.status!=="done").sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  return open[0] || null;
+}
+function lastT(){
+  return S.tournaments.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0] || null;
+}
+
+/* ---------- Довідники ---------- */
+const STROKES = [
+  {k:"fh",  label:"Форхенд"},
+  {k:"bh",  label:"Бекхенд"},
+  {k:"slice",label:"Різаний удар"},
+  {k:"drop", label:"Укорочений"},
+  {k:"smash",label:"Смеш"}
+];
+const SERVES = [
+  {k:"srvFlat", label:"Плоска подача"},
+  {k:"srvSlice",label:"Різана подача"},
+  {k:"srvKick", label:"Кручена подача"},
+  {k:"net",     label:"Вихід до сітки"}
+];
+const ALL_SKILLS = STROKES.concat(SERVES);
+const SURFACES = ["Хард","Ґрунт","Трава","Килим/зал","Інше"];
+function skillLabel(k){ const s = ALL_SKILLS.find(x=>x.k===k); return s? s.label : k; }
+
+/* ============================================================
+   ГЕНЕРАТОРИ РЕКОМЕНДАЦІЙ (rule-based, MVP)
+   Кожна порада має id для версіонування контенту.
+   ============================================================ */
+
+function isHeat(t){ return t.court==="open" && t.temp!=null && t.temp>=25; }
+function isEarly(t){ const m=t2m(t.firstMatch); return m!=null && m<600; } // до 10:00
+
+/* --- FR-02: план дня --- */
+function genDayPlan(p, t){
+  const m0 = t2m(t.firstMatch) ?? 600;
+  const arrive = t.arrive ? t2m(t.arrive) : m0-60;
+  const travel = +t.travelMin || 30;
+  const low = p && p.morningEnergy==="low";
+  const leave = arrive - travel;
+  const wake = leave - (low?90:70);
+  const bed = wake - 510; // 8 год сну + ~30 хв на засинання
+  const items = [
+    {time:bed, what:"Відбій (напередодні)", note:"Ціль — близько 8 годин сну." + (isEarly(t)&&low ? " Ранній старт: лягай раніше, буде важкий підйом." : ""), prev:true},
+    {time:wake, what:"Підйом", note:"Склянка води одразу; 5–7 хв легкої активації (суглоби, розтяжка)." + (low? " Дай собі більше часу розгойдатися.":"")},
+    {time:wake+20, what:"Сніданок", note:"Знайомий і простий: вуглеводи + трохи білка. Без експериментів у день гри."},
+    {time:leave, what:"Виїзд", note:"Дорога ≈ "+travel+" хв. Перевір сумку за чеклістом."},
+    {time:arrive, what:"Прибуття на корт", note:"Реєстрація, розкладка речей, вода."},
+    {time:Math.max(arrive+10, m0-45), what:"Розминка", note:"Повний блок у вкладці «Гра». " + (isHeat(t)? "У спеку — коротша інтенсивність, більше води.":"")},
+    {time:m0-15, what:"Фокус перед матчем", note:"Легкий перекус за потреби (банан/батончик), 3 повільні видихи, переглянь План А і мікроцілі."},
+    {time:m0, what:"Перший матч", note:"Одна мікроціль на старт. Грай процес, а не рахунок.", hot:true}
+  ];
+  return items;
+}
+
+function genHydration(p, t){
+  const heat = isHeat(t);
+  const many = (+t.expMax||0) >= 3;
+  const L = [];
+  if(heat){
+    L.push({id:"hyd.heat@1", txt:"Спека на відкритому корті: 2–3 л рідини на день, ізотонік між матчами, кожну перерву — в тінь."});
+    L.push({id:"hyd.heat.signs@1", txt:"Стеж за сигналами перегріву: запаморочення, «мурашки», озноб у спеку — одразу стоп і в тінь.", warn:true});
+  } else {
+    L.push({id:"hyd.base@1", txt:"Орієнтовно 1,5–2 л води на ігровий день; пий потроху між геймами, не залпом."});
+  }
+  if(many) L.push({id:"hyd.many@1", txt:(t.expMax)+" і більше матчів: додай ізотонік і сплануй повноцінний перекус після 2-го матчу."});
+  if(p && p.heatSensitive && t.court==="open") L.push({id:"hyd.sensitive@1", txt:"Ти позначив чутливість до спеки: кепка, тінь у кожній перерві, охолодження шиї/зап’ясть водою.", warn:true});
+  return L;
+}
+
+/* --- FR-02: чекліст речей --- */
+function genChecklist(p, t){
+  const items = [
+    "Ракетки (2 шт., якщо є) + запасні струни/гріпи",
+    "Вода " + (isHeat(t)? "2–3 л + ізотонік" : "1,5–2 л"),
+    "Перекуси: банани/батончики (або звичні альтернативи)",
+    "Рушник",
+    "Запасна футболка та шкарпетки",
+    "Легка аптечка: пластирі, еластичний бинт"
+  ];
+  if(t.court==="open"){ items.push("Кепка/козирок і сонцезахисний крем"); }
+  if(t.court==="open" && t.temp!=null && t.temp<15){ items.push("Вітровка/худі на перерви"); }
+  if(t.surface==="Ґрунт"){ items.push("Друга пара шкарпеток (ґрунт) і щітка для взуття"); }
+  if(t.balls){ items.push("Нотатка: м’ячі — " + t.balls + ". Придивись до відскоку на розминці."); }
+  items.push("Заряджений телефон + павербанк");
+  return items;
+}
+
+/* --- FR-03: план гри --- */
+function skillsRated(p){
+  const sk = (p&&p.skills)||{};
+  return ALL_SKILLS.map(s=>({k:s.k,label:s.label,v:+sk[s.k]||0})).filter(s=>s.v>0);
+}
+function strongSkills(p){
+  const rated = skillsRated(p).sort((a,b)=>b.v-a.v);
+  const strong = rated.filter(s=>s.v>=4);
+  return strong.length? strong : rated.slice(0,2);
+}
+function stableStroke(p){
+  const ground = skillsRated(p).filter(s=>["fh","bh","slice"].includes(s.k)).sort((a,b)=>b.v-a.v);
+  return ground[0] || null;
+}
+const PLAYS = {
+  fh:      {id:"pa.fh@1",   txt:"Будуй розіграш від форхенду: став м’яч глибоко у бекхенд суперника й забирай час, обходь під форхенд, коли є короткий м’яч."},
+  bh:      {id:"pa.bh@1",   txt:"Тримай ритм бекхендом: глибокий крос, а по лінії — лише з зручного м’яча. Змушуй суперника бігати."},
+  slice:   {id:"pa.slice@1",txt:"Міняй висоту різаним: низький м’яч під бекхенд суперника ламає його ритм і дає тобі час."},
+  drop:    {id:"pa.drop@1", txt:"Коли суперник глибоко за лінією — грай укорочений і одразу закривай сітку."},
+  smash:   {id:"pa.smash@1",txt:"Шукай короткий м’яч, виходь уперед і завершуй; свічку добивай смешем без сумнівів."},
+  srvFlat: {id:"pa.srvflat@1", txt:"На своїй подачі: перша — плоска по центру або в тіло, одразу готуйся атакувати коротку відповідь."},
+  srvSlice:{id:"pa.srvslice@1",txt:"Різана подача широко — відкривай корт і наступним ударом грай у порожню зону."},
+  srvKick: {id:"pa.srvkick@1", txt:"Перша установка на подачі: кручена у бекхенд — високий відскок, зручний наступний м’яч для атаки."},
+  net:     {id:"pa.net@1",  txt:"Після глибокого атакувального удару йди до сітки — заверши розіграш воллеєм."}
+};
+function genPlanA(p){
+  const strong = strongSkills(p).slice(0,4);
+  const list = strong.map(s=>PLAYS[s.k]).filter(Boolean);
+  const hasServe = strong.some(s=>["srvFlat","srvSlice","srvKick"].includes(s.k));
+  if(!hasServe) list.push({id:"pa.srv.def@1", txt:"На своїй подачі: перша подача з обертанням і запасом — головне, щоб перший м’яч летів у корт."});
+  list.push({id:"pa.ret.def@1", txt:"На прийомі: перший м’яч глибоко через центр, без ризику по лініях — увімкнись у розіграш."});
+  return list.slice(0,4);
+}
+function genPlanB(p, t){
+  const st = stableStroke(p);
+  const list = [
+    {id:"pb.margin@1", txt:"Додай запас: на 1 м вище над сіткою, цілься за 1–1,5 м від ліній. Нехай помиляється суперник."}
+  ];
+  if(t && t.wind==="strong") list.push({id:"pb.wind@1", txt:"Сильний вітер: більше обертання, вище запас, за вітром — обережніше з довжиною."});
+  list.push({id:"pb.center@1", txt:"Знизь темп і грай глибоко через центр — забери в суперника кути й час."});
+  if(st) list.push({id:"pb.stable@1", txt:"Частіше виходь на свій стабільний удар — " + st.label.toLowerCase() + " — і грай через нього довгі розіграші."});
+  return list.slice(0,3);
+}
+function genMicroGoals(p){
+  return [
+    {id:"mg.depth@1", txt:"Перші 3 гейми — усе глибоко через центр."},
+    {id:"mg.breath@1", txt:"Перед кожною своєю подачею — один повільний видих."},
+    {id:"mg.reset@1", txt:"Після помилки — короткий ритуал (струни/рушник) і одразу наступний м’яч."}
+  ];
+}
+/* --- FR-03: розминка --- */
+function genWarmup(p, t){
+  const heat = isHeat(t);
+  const cold = t.temp!=null && t.temp<12;
+  const blocks = [
+    {name:"Загальна частина · " + (cold? "10–12":"8–10") + " хв", items:[
+      "Легкий біг або скакалка — 3 хв",
+      "Обертання суглобів зверху вниз (шия → плечі → таз → коліна → стопи) — 2 хв",
+      "Динамічні випади, махи ногами, нахили — 3 хв" + (t.surface==="Ґрунт" ? " (додай 2–3 ковзання у випаді)" : ""),
+      "2 прискорення по 10 м"
+    ]},
+    {name:"Активація · 4–5 хв", items:[
+      "Стрибки на місці / через уявну скакалку — 1 хв",
+      "Тіньова гра з ракеткою: форхенд/бекхенд із кроками — 2 хв",
+      "Імітація подачі — 10 повторів із поступовим замахом"
+    ]},
+    {name:"Тенісний блок (якщо є корт) · 8–12 хв", items:[
+      "Міні-теніс у квадратах — 3 хв",
+      "Кроси з задньої лінії у спокійному темпі — 4 хв",
+      "Воллеї та 2–3 смеші — 2 хв",
+      "Подачі — 10–15 м’ячів, від легких до ігрових" + (t.balls? " (відчуй відскок: "+esc(t.balls)+")" : "")
+    ]}
+  ];
+  const notes = [];
+  if(heat) notes.push("У спеку: нижча інтенсивність, вода між блоками, розминайся в тіні, де можливо.");
+  if(cold) notes.push("Прохолодно: довша загальна частина, не знімай кофту до тенісного блоку.");
+  return {blocks, notes};
+}
+
+/* --- FR-04: протокол перерви --- */
+function genBreakProtocol(mins, m, t, matchCount){
+  const heat = isHeat(t);
+  const tired = m && ((+m.fatigue||0)>=4 || (+m.energy||6)<=2);
+  const conserv = tired || matchCount>=3;
+  let title, steps;
+  if(mins<=15){
+    title = "Коротка перерва · ~10 хв";
+    steps = [
+      "Вода одразу" + (heat? " + у тінь/прохолоду":""),
+      "5 повільних видихів, опусти плечі",
+      "Суха футболка, якщо мокра",
+      "Одна думка: що залишаю з минулого матчу, що беру в наступний"
+    ];
+  } else if(mins<=40){
+    title = "Перерва 20–30 хв";
+    steps = [
+      "Вода" + (heat? "/ізотонік":"") + ", сядь у тінь",
+      "Легкий перекус за потреби: банан або батончик",
+      "Легка рухливість: походи, покрути плечима — не сиди весь час",
+      "Переглянь 1–2 установки з Плану " + (m && (+m.planScore||0)<=2 ? "Б (План А поки не працює)" : "А"),
+      "За 5 хв до виходу — кілька тіньових ударів"
+    ];
+  } else {
+    title = "Довга перерва · 60+ хв";
+    steps = [
+      "Повноцінний легкий прийом їжі (звичні продукти, без важкого)",
+      "Вода" + (heat? " + ізотонік":"") + " потроху весь час",
+      "10 хв відпочинку: ноги вище, очі закриті або спокійна музика",
+      "За 15–20 хв до матчу — повторна коротка розминка: 5–7 хв активації + кілька подач"
+    ];
+  }
+  const extra = [];
+  if(conserv) extra.push({id:"br.conserv@1", txt:"Втома накопичується: обери консервативніший план — одна проста мікроціль, менше ризику, більше відновлення.", warn:true});
+  if(heat) extra.push({id:"br.heat@1", txt:"Спека: охолоджуй шию/зап’ястя водою, перерву проводь у тіні.", warn:true});
+  return {title, steps, extra};
+}
+
+/* --- FR-06: заминка та відновлення --- */
+function genCooldown(t){
+  const n = (t.matches||[]).length;
+  const avgFat = avg((t.matches||[]).map(m=>+m.fatigue||null));
+  const long = n>=3 || (avgFat!=null && avgFat>=4);
+  const items = [
+    "Спокійна ходьба — 2–3 хв, вирівняй дихання",
+    "Литки та ахілли — по 30 с на ногу",
+    "Задня поверхня стегна + сідниці — по 30 с",
+    "Квадрицепс і згиначі стегна — по 30 с",
+    "Спина: нахил уперед + м’яка ротація — 1 хв",
+    "Плечі та передпліччя (ігрова рука довше) — 1–2 хв"
+  ];
+  if(long) items.push("Додатково сьогодні: 5 хв дуже легкої мобільності ввечері, за можливості — прохолодний душ на ноги");
+  const recovery = [
+    "Протягом 1–2 год: їжа з білком і вуглеводами",
+    "Вода/електроліти до вечора — сеча має бути світлою",
+    "Сон 8+ годин: сьогодні це головне тренування",
+    "Завтра — легка активність: прогулянка або спокійна розтяжка"
+  ];
+  return {dur: long? "12–15 хв" : "8–10 хв", items, recovery};
+}
+
+/* --- FR-05: SOS-контент --- */
+const SOS_TOPICS = [
+  {k:"srv",   ic:"🎾", label:"Подача не йде"},
+  {k:"err",   ic:"💥", label:"Багато помилок"},
+  {k:"pace",  ic:"⏱️", label:"Суперник тисне, не встигаю"},
+  {k:"nerves",ic:"😮‍💨", label:"Нерви: тремтять руки, злюся"},
+  {k:"lost",  ic:"🧭", label:"Розгубився, план не працює"},
+  {k:"pain",  ic:"🚑", label:"Біль / запаморочення / перегрів", danger:true}
+];
+function sosTip(k, p){
+  const st = stableStroke(p);
+  const T = {
+    srv: {id:"sos.srv@1", breath:"Повільний видих перед кожною подачею.",
+      action:"Наступні 2 гейми: перша подача на 80% сили, з обертанням, у бекхенд. Єдина ціль — перший м’яч у квадрат.",
+      phrase:"Не треба виграти весь матч зараз. Лише наступну подачу."},
+    err: {id:"sos.err@1", breath:"Видих — і розслаб кисть на ракетці.",
+      action:"Наступні 4 м’ячі — із запасом 1 м над сіткою, глибоко через центр. Нічого по лініях.",
+      phrase:"Стабільний м’яч зараз цінніший за красивий."},
+    pace: {id:"sos.pace@1", breath:"Між очками — повний повільний видих, не поспішай подавати.",
+      action:"Розірви його ритм: вище траєкторія, більше часу між розіграшами, один різаний у кожному розіграші.",
+      phrase:"Це твій темп гри. Він підлаштується під тебе."},
+    nerves: {id:"sos.nerves@1", breath:"3 рази: вдих на 4, видих на 6. Опусти плечі, струсни кисть.",
+      action:"Одна мікроціль: наступний м’яч — просто в корт із запасом над сіткою. Більше нічого.",
+      phrase:"Зараз не потрібно виграти весь матч. Повернися до одного простого завдання."},
+    lost: {id:"sos.lost@1", breath:"Пауза. Видих. Подивись на струни 5 секунд.",
+      action:"Перемикайся на План Б: безпечний напрямок, вище над сіткою" + (st? ", і грай через свій стабільний удар — "+st.label.toLowerCase() : "") + ".",
+      phrase:"План Б — це теж план. Один розіграш за раз."},
+    pain: {id:"sos.pain@1", danger:true,
+      action:"Зупини навантаження. Сядь у тінь/прохолоду, пий воду маленькими ковтками.",
+      phrase:"За болю, запаморочення чи симптомів перегріву — звернися до лікаря турніру або організатора. Не продовжуй гру через біль: це не слабкість, це правильне рішення."}
+  };
+  return T[k];
+}
+
+/* --- FR-06: авто-висновки звіту --- */
+function genInsights(t, p){
+  const ms = t.matches||[];
+  const out = [];
+  const aPlan = avg(ms.map(m=>+m.planScore||null));
+  const aHyd  = avg(ms.map(m=>+m.hydration||null));
+  const an = t.analysis||{};
+  const wins = ms.filter(m=>m.win===true), losses = ms.filter(m=>m.win===false);
+  const wPlan = avg(wins.map(m=>+m.planScore||null)), lPlan = avg(losses.map(m=>+m.planScore||null));
+  if(wPlan!=null && lPlan!=null && wPlan-lPlan>=1)
+    out.push("У виграних матчах ти тримався плану помітно краще (" + r1(wPlan) + " проти " + r1(lPlan) + "). План працює — довіряй йому з перших геймів.");
+  if(aPlan!=null && aPlan>=4) out.push("Висока дисципліна плану (" + r1(aPlan) + "/5) — залиш План А основою на наступний турнір.");
+  if(aPlan!=null && aPlan<=2.5) out.push("План виконувався слабко (" + r1(aPlan) + "/5). Спробуй наступного разу простіший План А: лише 2 установки.");
+  if((+an.sleep||0)>0 && +an.sleep<=2) out.push("Сон напередодні був слабким — постав його фокусом №1: план вечора і відбій за таймлайном.");
+  if(aHyd!=null && aHyd<=2.5) out.push("Гідратація просідала (" + r1(aHyd) + "/5)" + (isHeat(t)? ", а в спеку це критично":"") + " — наступного разу пляшка завжди поруч + нагадування пити між геймами.");
+  const sos = (t.interventions||[]);
+  if(sos.length){
+    const helped = sos.filter(i=>i.helpful===true).length;
+    out.push("SOS-режим використано " + sos.length + " раз(и)" + (helped? ", допоміг у "+helped : "") + " — короткий скидання-ритуал варто вбудувати у гру заздалегідь.");
+  }
+  if((+an.warmupScore||0)>0 && +an.warmupScore<=2) out.push("Розминка була скомкана — заклади на неї окремий час у плані дня.");
+  if(!out.length) out.push("Рівний турнір без яскравих перекосів. Обери 1 фокус розвитку сам — від найслабшого удару або від відчуттів.");
+  return out.slice(0,3);
+}
+/* ============================================================
+   РОУТЕР, НАВІГАЦІЯ, ЕКРАНИ (частина 1)
+   ============================================================ */
+
+function setTop(title, back){
+  $("#topbar").innerHTML =
+    (back? '<button class="backbtn" id="btnBack" aria-label="Назад">‹</button>' : '<div class="spacer"></div>') +
+    "<h1>"+esc(title)+"</h1><div class=\"spacer\"></div>";
+  if(back){ $("#btnBack").onclick = ()=>{ history.length>1 ? history.back() : nav("#/home"); }; }
+}
+
+function renderTabbar(){
+  const a = activeT();
+  const planHref = a ? "#/t/"+a.id+"/plan" : "#/tnew";
+  const matchHref = a ? "#/t/"+a.id+"/matches" : (lastT()? "#/t/"+lastT().id+"/matches" : "#/tnew");
+  const h = location.hash || "#/home";
+  const on = pre => h.startsWith(pre) ? "on" : "";
+  $("#tabbar").innerHTML = '<div class="inner">'
+    + '<a href="#/home" class="'+(h==="#/home"||h===""||h==="#"?"on":"")+'"><span class="ic">🏠</span>Головна</a>'
+    + '<a href="'+planHref+'" class="'+(on("#/t/")&&(h.includes("/plan")||h.includes("/game"))||on("#/tnew")?"on":"")+'"><span class="ic">📋</span>План</a>'
+    + '<a href="#/sos" class="sos" aria-label="Потрібна допомога зараз"><span class="bubble">SOS</span></a>'
+    + '<a href="'+matchHref+'" class="'+(h.includes("/matches")||h.includes("/report")||on("#/newmatch")?"on":"")+'"><span class="ic">🎾</span>Матчі</a>'
+    + '<a href="#/profile" class="'+on("#/profile")+'"><span class="ic">👤</span>Профіль</a>'
+    + '</div>';
+}
+
+function render(){
+  const h = (location.hash||"#/home").replace(/^#\/?/,"");
+  const p = h.split("/");
+  window.scrollTo(0,0);
+  renderTabbar();
+  if(h===""||p[0]==="home") return scrHome();
+  if(p[0]==="profile") return scrProfile();
+  if(p[0]==="strengths") return scrStrengths();
+  if(p[0]==="tnew") return scrTournForm(null);
+  if(p[0]==="tedit") return scrTournForm(getT(p[1]));
+  if(p[0]==="t" && getT(p[1])) return scrTournament(getT(p[1]), p[2]||"plan");
+  if(p[0]==="newmatch" && getT(p[1])) return scrMatchForm(getT(p[1]));
+  if(p[0]==="break" && getT(p[1])) return scrBreak(getT(p[1]), p[2]);
+  if(p[0]==="sos") return scrSOS(p[1]);
+  if(p[0]==="finish" && getT(p[1])) return scrFinish(getT(p[1]));
+  if(p[0]==="data") return scrData();
+  nav("#/home");
+}
+
+/* ---------- Компоненти форм ---------- */
+function segInput(id, val){
+  let b="";
+  for(let v=1;v<=5;v++) b += '<button type="button" data-v="'+v+'" class="'+(+val===v?"on":"")+'">'+v+"</button>";
+  return '<div class="seg" id="'+id+'" data-value="'+(val||"")+'">'+b+"</div>";
+}
+function chipsInput(id, options, val){
+  return '<div class="chips" id="'+id+'" data-value="'+esc(val||"")+'">' +
+    options.map(o=>'<button type="button" data-v="'+esc(o.v)+'" class="'+(String(val)===String(o.v)?"on":"")+'">'+esc(o.label)+"</button>").join("") + "</div>";
+}
+function segVal(id){ const el=$("#"+id); return el && el.dataset.value ? +el.dataset.value : null; }
+function chipVal(id){ const el=$("#"+id); return el ? (el.dataset.value||null) : null; }
+function bindPickers(){
+  $$(".seg,.chips").forEach(g=>{
+    g.onclick = e=>{
+      const b = e.target.closest("button"); if(!b) return;
+      g.dataset.value = b.dataset.v;
+      $$("button",g).forEach(x=>x.classList.toggle("on", x===b));
+    };
+  });
+}
+function val(id){ const el=$("#"+id); return el? el.value.trim() : ""; }
+function num(id){ const v=val(id); return v===""? null : +v; }
+
+/* ============================================================
+   ГОЛОВНИЙ ЕКРАН
+   ============================================================ */
+function scrHome(){
+  setTop("Персональний Тренер", false);
+  const app = $("#app");
+  if(!S.profile){
+    app.innerHTML =
+      '<div class="card accent center" style="padding:28px 18px">' +
+        '<div class="bigicon">🎾</div>' +
+        "<h2>Твій тренер на турнірний день</h2>" +
+        '<p class="muted">План підготовки, тактика А/Б, підтримка між матчами та розбір після гри — усе в телефоні, працює офлайн.</p>' +
+        '<button class="btn primary" id="go">Створити профіль · 2 хв</button>' +
+      "</div>" +
+      '<div class="card"><h2>Як це працює</h2><ul class="clean muted">' +
+        "<li>Розкажи про свій рівень і улюблені удари</li>" +
+        "<li>Додай турнір — отримаєш план дня та тактику</li>" +
+        "<li>Між матчами застосунок підкаже, що робити</li>" +
+        "<li>Після — звіт, яким можна поділитися з тренером</li>" +
+      "</ul></div>" +
+      '<p class="notice">Дані зберігаються лише на цьому пристрої. Поради орієнтовні й не є медичними призначеннями.</p>';
+    $("#go").onclick = ()=>nav("#/profile");
+    return;
+  }
+  const a = activeT();
+  const name = S.profile.name ? ", "+S.profile.name : "";
+  let html = '<p style="font-size:1.25rem;font-weight:800;margin:2px 4px 12px">Привіт'+esc(name)+' 👋</p>';
+
+  if(!a){
+    html += '<div class="card accent"><h2>Наступний крок</h2>' +
+      '<p class="muted">Додай турнір — і за хвилину отримаєш персональний план дня, тактику та чекліст.</p>' +
+      '<button class="btn primary" id="addT">+ Додати турнір</button></div>';
+  } else {
+    const today = todayISO();
+    const isToday = a.date===today, isPast = a.date<today;
+    const played = (a.matches||[]).length;
+    let cta, sub, href;
+    if(isToday || isPast){
+      if(played===0){ cta="Відкрити план дня"; sub="Сьогодні граєш! Таймлайн, розминка і План А чекають."; href="#/t/"+a.id+"/plan"; }
+      else { cta="Записати матч №"+(played+1); sub="Зіграно матчів: "+played+". Запиши результат — підкажу, що робити в перерві."; href="#/newmatch/"+a.id; }
+    } else {
+      const dd = Math.round((new Date(a.date)-new Date(today))/86400000);
+      cta="Продовжити підготовку"; sub="До турніру: "+dd+" дн. Перевір план дня і чекліст."; href="#/t/"+a.id+"/plan";
+    }
+    html += '<div class="card accent"><span class="badge lime">'+esc(fmtDate(a.date))+'</span>' +
+      '<h2 style="margin-top:8px">'+esc(a.name||"Турнір")+"</h2>" +
+      '<p class="muted">'+sub+"</p>" +
+      '<button class="btn primary" data-href="'+href+'">'+cta+"</button>" +
+      (played? '<button class="btn ghost" style="margin-top:8px" data-href="#/finish/'+a.id+'">Завершити турнір → звіт</button>':"") +
+      "</div>";
+  }
+
+  html += '<div class="card" style="display:flex;gap:12px;align-items:center">' +
+    '<div style="font-size:1.8rem">🆘</div><div class="grow">' +
+    "<b>Складний момент у грі?</b><br><span class=\"muted small\">Кнопка SOS внизу — коротка підказка за 30 секунд.</span></div></div>";
+
+  const past = S.tournaments.filter(t=>t.status==="done").sort((x,y)=>(y.date||"").localeCompare(x.date||""));
+  if(past.length){
+    html += '<h2 style="font-size:1rem;margin:18px 4px 8px">Минулі турніри</h2>';
+    past.forEach(t=>{
+      const w=(t.matches||[]).filter(m=>m.win===true).length, l=(t.matches||[]).filter(m=>m.win===false).length;
+      html += '<div class="card" style="cursor:pointer" data-href="#/t/'+t.id+'/report"><div class="row">' +
+        '<div class="grow"><b>'+esc(t.name||"Турнір")+'</b><div class="muted small">'+esc(fmtDate(t.date))+"</div></div>" +
+        '<span class="badge">'+w+"–"+l+"</span></div></div>";
+    });
+  }
+  if(S.tournaments.length) html += '<button class="btn ghost" id="addT2">+ Новий турнір</button>';
+  app.innerHTML = html;
+  $$("[data-href]").forEach(el=>el.onclick=()=>nav(el.dataset.href));
+  const b1=$("#addT"); if(b1) b1.onclick=()=>nav("#/tnew");
+  const b2=$("#addT2"); if(b2) b2.onclick=()=>nav("#/tnew");
+}
+
+/* ============================================================
+   FR-01: ПРОФІЛЬ
+   ============================================================ */
+function scrProfile(){
+  const p = S.profile || {};
+  const first = !S.profile;
+  setTop(first? "Створення профілю" : "Мій профіль", !first);
+  const sk = p.skills||{};
+  const scale = '<div class="seglbl"><span>1 — поки не впевнено</span><span>5 — дуже впевнено</span></div>';
+  $("#app").innerHTML =
+    (first? '<div class="progress"><i style="width:33%"></i></div><p class="muted" style="margin-top:-8px">Крок 1 з 3 · Це займе ~2 хвилини. Усе можна змінити пізніше.</p>' : "") +
+
+    '<div class="card"><h2>Основне</h2>' +
+      '<div class="field"><label>Ім’я або псевдонім (опційно)</label><input class="input" id="f_name" maxlength="40" value="'+esc(p.name)+'" placeholder="Як до тебе звертатися"></div>' +
+      '<div class="grid2">' +
+        '<div class="field"><label>Вік</label><input class="input" id="f_age" type="number" min="10" max="99" inputmode="numeric" value="'+esc(p.age)+'" placeholder="напр., 32"></div>' +
+        '<div class="field"><label>Стать (опційно)</label><select class="input" id="f_sex">'+
+          ["","Жінка","Чоловік","Інше / не вказувати"].map(o=>'<option value="'+o+'"'+(p.sex===o?" selected":"")+">"+(o||"—")+"</option>").join("")+"</select></div>" +
+        '<div class="field"><label>Зріст, см</label><input class="input" id="f_h" type="number" min="120" max="230" inputmode="numeric" value="'+esc(p.height)+'"></div>' +
+        '<div class="field"><label>Вага, кг</label><input class="input" id="f_w" type="number" min="30" max="200" inputmode="numeric" value="'+esc(p.weight)+'"></div>' +
+      "</div>" +
+      '<div class="field"><label>Ігрова рука</label>'+chipsInput("f_hand",[{v:"right",label:"Права"},{v:"left",label:"Ліва"}],p.hand)+"</div>" +
+      '<p class="hint" id="ageHint" style="display:none;color:var(--warn)">Застосунок розрахований на гравців від 14 років. Для молодших потрібна згода дорослого.</p>' +
+    "</div>" +
+
+    '<div class="card"><h2>Досвід і рівень</h2>' +
+      '<div class="grid2">' +
+        '<div class="field"><label>Років у тенісі</label><input class="input" id="f_years" type="number" min="0" max="80" inputmode="numeric" value="'+esc(p.years)+'"></div>' +
+        '<div class="field"><label>Граю зазвичай</label><select class="input" id="f_freq">'+
+          ["","Рідше 1 разу/тижд","1–2 рази/тижд","3+ рази/тижд"].map(o=>'<option value="'+o+'"'+(p.freq===o?" selected":"")+">"+(o||"—")+"</option>").join("")+"</select></div>" +
+      "</div>" +
+      '<div class="field"><label>Рівень (NTRP 2.0–5.0)</label><select class="input" id="f_level">'+
+        ["","2.0","2.5","3.0","3.5","4.0","4.5","5.0"].map(o=>'<option value="'+o+'"'+(p.level===o?" selected":"")+">"+(o||"Не знаю")+"</option>").join("")+"</select>" +
+        '<button type="button" class="btn ghost sm" id="lvlHelp" style="margin-top:8px">Допоможіть визначити</button>' +
+        '<div id="lvlBox" class="muted small" style="display:none;margin-top:8px;line-height:1.6">' +
+          "<b>2.0–2.5</b> — освоюю техніку, розіграші короткі.<br>" +
+          "<b>3.0</b> — стабільно тримаю м’яч у грі в середньому темпі.<br>" +
+          "<b>3.5</b> — контролюю напрямок, зʼявляється тактика й різні оберти.<br>" +
+          "<b>4.0</b> — впевнені удари, будую розіграш, стабільна перша подача.<br>" +
+          "<b>4.5–5.0</b> — граю силою/обертанням свідомо, читаю гру суперника.</div>" +
+      "</div>" +
+      '<div class="field"><label>Рейтинг у своїй лізі (опційно, напр. 400–1000)</label><input class="input" id="f_rating" inputmode="numeric" value="'+esc(p.rating)+'" placeholder="напр., 650"></div>' +
+    "</div>" +
+
+    '<div class="card"><h2>Удари</h2><p class="muted small">Оціни впевненість — від цього будується твій План А.</p>' +
+      STROKES.map(s=>'<div class="field"><label>'+s.label+"</label>"+segInput("sk_"+s.k, sk[s.k])+scale+"</div>").join("") +
+    "</div>" +
+
+    '<div class="card"><h2>Подача й сітка</h2>' +
+      SERVES.map(s=>'<div class="field"><label>'+s.label+"</label>"+segInput("sk_"+s.k, sk[s.k])+scale+"</div>").join("") +
+    "</div>" +
+
+    '<div class="card"><h2>Про свою гру</h2>' +
+      '<div class="field"><label>Сильні сторони, улюблений темп, типові труднощі</label>' +
+      '<textarea class="input" id="f_desc" maxlength="500" placeholder="Напр.: люблю грати від форхенду в високому темпі; важко проти різаних низьких; у нервах поспішаю.">'+esc(p.selfDesc)+"</textarea>" +
+      '<div class="hint"><span id="descCnt">0</span>/500</div></div>' +
+    "</div>" +
+
+    '<div class="card"><h2>Самопочуття <span class="badge">опційно</span></h2>' +
+      '<p class="muted small">Використовується лише щоб не радити тобі небезпечного.</p>' +
+      '<div class="field"><label>Травми чи обмеження</label><input class="input" id="f_inj" maxlength="200" value="'+esc(p.injuries)+'" placeholder="напр., коліно — без різких стрибків"></div>' +
+      '<div class="field"><label>Чутливість до спеки</label>'+chipsInput("f_heat",[{v:"no",label:"Ні"},{v:"yes",label:"Так, важко у спеку"}],p.heatSensitive?"yes":(p.heatSensitive===false?"no":""))+"</div>" +
+      '<div class="field"><label>Обмеження в харчуванні / алергії</label><input class="input" id="f_food" maxlength="200" value="'+esc(p.foodNotes)+'"></div>' +
+      '<div class="field"><label>Ранкова енергія (для ранніх матчів)</label>'+chipsInput("f_morning",[{v:"low",label:"Низька"},{v:"mid",label:"Середня"},{v:"high",label:"Висока"}],p.morningEnergy)+"</div>" +
+    "</div>" +
+
+    '<button class="btn primary" id="saveP">'+(first?"Зберегти профіль →":"Зберегти зміни")+"</button>" +
+    (first? "" : '<button class="btn ghost" style="margin-top:10px" id="goData">Мої дані та приватність</button>') +
+    '<p class="notice">Профіль можна редагувати будь-коли.</p>';
+
+  bindPickers();
+  const descEl = $("#f_desc"), cnt = $("#descCnt");
+  const updCnt = ()=>cnt.textContent = descEl.value.length; updCnt(); descEl.oninput = updCnt;
+  $("#lvlHelp").onclick = ()=>{ const b=$("#lvlBox"); b.style.display = b.style.display==="none"?"block":"none"; };
+  $("#f_age").oninput = ()=>{ $("#ageHint").style.display = (+$("#f_age").value>0 && +$("#f_age").value<14)? "block":"none"; };
+  const gd = $("#goData"); if(gd) gd.onclick=()=>nav("#/data");
+
+  $("#saveP").onclick = ()=>{
+    const skills = {};
+    ALL_SKILLS.forEach(s=>{ const v=segVal("sk_"+s.k); if(v) skills[s.k]=v; });
+    if(!Object.keys(skills).length){ toast("Оціни хоча б один удар — без цього не побудувати План А"); return; }
+    const firstSave = !S.profile;
+    S.profile = {
+      name:val("f_name"), age:num("f_age"), sex:val("f_sex"), height:num("f_h"), weight:num("f_w"),
+      hand:chipVal("f_hand")||"", years:num("f_years"), freq:val("f_freq"), level:val("f_level"), rating:val("f_rating"),
+      skills, selfDesc:val("f_desc"),
+      injuries:val("f_inj"), heatSensitive:chipVal("f_heat")==="yes", foodNotes:val("f_food"),
+      morningEnergy:chipVal("f_morning")||""
+    };
+    save(); toast("Профіль збережено");
+    nav(firstSave? "#/strengths" : "#/home");
+  };
+}
+
+/* --- Підтвердження сильних сторін (онбординг, крок 2) --- */
+function scrStrengths(){
+  const p = S.profile; if(!p) return nav("#/profile");
+  setTop("Твої сильні сторони", true);
+  const strong = strongSkills(p);
+  $("#app").innerHTML =
+    '<div class="progress"><i style="width:66%"></i></div>' +
+    '<div class="card accent"><h2>Ось від чого будуватимемо тактику</h2>' +
+      '<div class="chips" style="margin:10px 0">' + strong.map(s=>'<button type="button" class="on" style="pointer-events:none">'+esc(s.label)+" · "+s.v+"/5</button>").join("") + "</div>" +
+      (p.selfDesc? '<p class="muted small">Ти про себе: «'+esc(p.selfDesc)+'»</p>' : "") +
+      '<p class="muted">План А завжди спирається на удари з оцінкою 4–5. Слабші удари не стануть опорою тактики.</p>' +
+    "</div>" +
+    '<button class="btn primary" id="ok">Усе так, продовжити</button>' +
+    '<button class="btn ghost" style="margin-top:10px" id="fix">Виправити оцінки</button>';
+  $("#ok").onclick = ()=>nav(S.tournaments.length? "#/home" : "#/tnew");
+  $("#fix").onclick = ()=>nav("#/profile");
+}
+
+/* ============================================================
+   FR-02: ТУРНІР (створення / редагування)
+   ============================================================ */
+function scrTournForm(t){
+  const isNew = !t; t = t || {};
+  if(!S.profile){ nav("#/profile"); return; }
+  setTop(isNew? "Новий турнір" : "Редагувати турнір", true);
+  const f = t.format||{};
+  $("#app").innerHTML =
+    (isNew && S.tournaments.length===0 ? '<div class="progress"><i style="width:100%"></i></div><p class="muted" style="margin-top:-8px">Крок 3 з 3 · Після збереження отримаєш план дня.</p>':"") +
+    '<div class="card"><h2>Коли і де</h2>' +
+      '<div class="field"><label>Назва (опційно)</label><input class="input" id="t_name" maxlength="60" value="'+esc(t.name)+'" placeholder="напр., Кубок клубу"></div>' +
+      '<div class="grid2">' +
+        '<div class="field"><label>Дата</label><input class="input" id="t_date" type="date" value="'+esc(t.date||todayISO())+'"></div>' +
+        '<div class="field"><label>Перший матч</label><input class="input" id="t_first" type="time" value="'+esc(t.firstMatch||"10:00")+'"></div>' +
+        '<div class="field"><label>Прибуття на корт</label><input class="input" id="t_arrive" type="time" value="'+esc(t.arrive)+'"><div class="hint">Порожньо = за 60 хв до матчу</div></div>' +
+        '<div class="field"><label>Дорога, хв</label><input class="input" id="t_travel" type="number" min="0" max="300" inputmode="numeric" value="'+esc(t.travelMin!=null?t.travelMin:30)+'"></div>' +
+      "</div></div>" +
+
+    '<div class="card"><h2>Умови</h2>' +
+      '<div class="field"><label>Корт</label>'+chipsInput("t_court",[{v:"open",label:"Відкритий"},{v:"indoor",label:"Закритий"}],t.court||"open")+"</div>" +
+      '<div class="field"><label>Покриття</label><select class="input" id="t_surface">'+
+        SURFACES.map(o=>'<option'+((t.surface||"Хард")===o?" selected":"")+">"+o+"</option>").join("")+"</select></div>" +
+      '<div class="grid2">' +
+        '<div class="field"><label>Температура, °C</label><input class="input" id="t_temp" type="number" min="-10" max="45" inputmode="numeric" value="'+esc(t.temp)+'" placeholder="прогноз"></div>' +
+        '<div class="field"><label>Вітер</label><select class="input" id="t_wind">'+
+          [["","—"],["calm","Майже немає"],["mid","Помірний"],["strong","Сильний"]].map(o=>'<option value="'+o[0]+'"'+((t.wind||"")===o[0]?" selected":"")+">"+o[1]+"</option>").join("")+"</select></div>" +
+      "</div>" +
+      '<div class="field"><label>М’ячі (тип/марка, якщо відомо)</label><input class="input" id="t_balls" maxlength="60" value="'+esc(t.balls)+'" placeholder="напр., Head Tour — нові"></div>' +
+    "</div>" +
+
+    '<div class="card"><h2>Формат</h2>' +
+      '<div class="field"><label>Матч</label><select class="input" id="t_sets">'+
+        ["Один сет","До 2 виграних сетів","Інший формат"].map(o=>'<option'+((f.sets||"Один сет")===o?" selected":"")+">"+o+"</option>").join("")+"</select></div>" +
+      '<div class="field"><label>Правило 40:40</label>'+chipsInput("t_noad",[{v:"noad",label:"Вирішальний розіграш"},{v:"adv",label:"Класика (з переваги)"}],f.noAd?"noad":(f.noAd===false?"adv":""))+"</div>" +
+      '<div class="field"><label>Тайбрейк</label><select class="input" id="t_tb">'+
+        ["При 6:6","При 5:5","Без тайбрейка"].map(o=>'<option'+((f.tb||"При 6:6")===o?" selected":"")+">"+o+"</option>").join("")+"</select></div>" +
+    "</div>" +
+
+    '<div class="card"><h2>Очікуване навантаження</h2>' +
+      '<div class="grid2">' +
+        '<div class="field"><label>Матчів (мін.)</label><input class="input" id="t_min" type="number" min="1" max="10" inputmode="numeric" value="'+esc(t.expMin!=null?t.expMin:2)+'"></div>' +
+        '<div class="field"><label>Матчів (макс.)</label><input class="input" id="t_max" type="number" min="1" max="12" inputmode="numeric" value="'+esc(t.expMax!=null?t.expMax:4)+'"></div>' +
+      "</div>" +
+      '<div class="field"><label>Орієнтовна тривалість матчу</label><select class="input" id="t_dur">'+
+        ["~45 хв","~1 година","1,5 години і більше"].map(o=>'<option'+((t.matchDur||"~1 година")===o?" selected":"")+">"+o+"</option>").join("")+"</select></div>" +
+    "</div>" +
+
+    '<button class="btn primary" id="saveT">'+(isNew?"Створити план дня →":"Оновити план")+"</button>" +
+    (isNew? "" : '<button class="btn outline-danger" style="margin-top:10px" id="delT">Видалити турнір</button>');
+
+  bindPickers();
+  $("#saveT").onclick = ()=>{
+    if(!val("t_date") || !val("t_first")){ toast("Вкажи дату і час першого матчу"); return; }
+    const data = {
+      name:val("t_name") || "Турнір "+fmtDate(val("t_date")),
+      date:val("t_date"), firstMatch:val("t_first"), arrive:val("t_arrive")||"", travelMin:num("t_travel")??30,
+      court:chipVal("t_court")||"open", surface:val("t_surface"), temp:num("t_temp"), wind:val("t_wind"), balls:val("t_balls"),
+      format:{ sets:val("t_sets"), noAd:chipVal("t_noad")==="noad", tb:val("t_tb") },
+      expMin:num("t_min"), expMax:num("t_max"), matchDur:val("t_dur")
+    };
+    if(isNew){
+      const nt = Object.assign({id:uid(), status:"active", checkDone:{}, warmDone:{}, matches:[], interventions:[]}, data);
+      S.tournaments.push(nt); save(); toast("План дня готовий 🎾"); nav("#/t/"+nt.id+"/plan");
+    } else {
+      Object.assign(t, data); save(); toast("Оновлено"); nav("#/t/"+t.id+"/plan");
+    }
+  };
+  const del = $("#delT");
+  if(del) del.onclick = ()=>{
+    if(confirm("Видалити турнір разом із матчами та звітом?")){
+      S.tournaments = S.tournaments.filter(x=>x.id!==t.id); save(); nav("#/home");
+    }
+  };
+}
+
+/* ============================================================
+   ЕКРАН ТУРНІРУ (вкладки)
+   ============================================================ */
+function scrTournament(t, tab){
+  setTop(t.name||"Турнір", true);
+  const tabs = [["plan","План дня"],["game","Гра"],["matches","Матчі"],["report","Звіт"]];
+  let html = '<div class="row" style="margin-bottom:10px;gap:8px">' +
+    '<span class="badge lime">'+esc(fmtDate(t.date))+"</span>" +
+    '<span class="badge">'+ (t.court==="open"?"Відкритий":"Закритий") + " · " + esc(t.surface||"") + "</span>" +
+    (t.temp!=null? '<span class="badge'+(isHeat(t)?" warn":"")+'">'+t.temp+"°C</span>":"") +
+    '<span class="grow"></span><button class="btn ghost sm" id="editT">✎</button></div>';
+  html += '<div class="tabs">' + tabs.map(x=>'<button data-tab="'+x[0]+'" class="'+(tab===x[0]?"on":"")+'">'+x[1]+"</button>").join("") + "</div>";
+  html += '<div id="tabbody"></div>';
+  $("#app").innerHTML = html;
+  $("#editT").onclick = ()=>nav("#/tedit/"+t.id);
+  $$(".tabs button").forEach(b=>b.onclick=()=>nav("#/t/"+t.id+"/"+b.dataset.tab));
+  const body = $("#tabbody");
+  if(tab==="plan") tabPlan(t, body);
+  else if(tab==="game") tabGame(t, body);
+  else if(tab==="matches") tabMatches(t, body);
+  else tabReport(t, body);
+}
+
+/* --- Вкладка: план дня --- */
+function tabPlan(t, el){
+  const p = S.profile;
+  const items = genDayPlan(p, t);
+  const hyd = genHydration(p, t);
+  const check = genChecklist(p, t);
+  let html = '<div class="card"><h2>Таймлайн дня</h2><p class="muted small">Орієнтовно — підлаштуй під себе. Час рахується від матчу о '+esc(t.firstMatch)+".</p><div class=\"tl\">";
+  items.forEach(it=>{
+    html += '<div class="item'+(it.hot?" hot":"")+'"><span class="time">'+m2t(it.time)+"</span>"+(it.prev?' <span class="badge">напередодні</span>':"")+
+      ' — <span class="what">'+esc(it.what)+'</span><div class="note">'+esc(it.note)+"</div></div>";
+  });
+  html += "</div></div>";
+
+  html += '<div class="card'+(hyd.some(x=>x.warn)?" ":"")+'"><h2>Вода та енергія</h2><ul class="clean">' +
+    hyd.map(x=>'<li'+(x.warn?' style="color:var(--warn)"':"")+">"+esc(x.txt)+"</li>").join("") + "</ul></div>";
+
+  html += '<div class="card"><h2>Чекліст речей</h2><div id="chk">';
+  check.forEach((c,i)=>{
+    const on = t.checkDone && t.checkDone[i];
+    html += '<div class="check'+(on?" on":"")+'" data-i="'+i+'"><div class="box">'+(on?"✓":"")+'</div><div class="txt">'+esc(c)+"</div></div>";
+  });
+  html += "</div></div>";
+  html += '<button class="btn primary" data-go="#/t/'+t.id+'/game">Далі: План гри та розминка →</button>';
+  html += '<p class="notice">Усі рекомендації орієнтовні, не є медичними призначеннями і редагуються під себе.</p>';
+  el.innerHTML = html;
+  $$("#chk .check").forEach(c=>c.onclick=()=>{
+    const i = c.dataset.i; t.checkDone = t.checkDone||{};
+    t.checkDone[i] = !t.checkDone[i]; save();
+    c.classList.toggle("on", t.checkDone[i]);
+    $(".box",c).textContent = t.checkDone[i]? "✓":"";
+  });
+  $$("[data-go]").forEach(b=>b.onclick=()=>nav(b.dataset.go));
+}
+
+/* --- Вкладка: гра (План А/Б, мікроцілі, розминка) --- */
+function tabGame(t, el){
+  const p = S.profile;
+  const A = genPlanA(p), B = genPlanB(p,t), MG = genMicroGoals(p);
+  const W = genWarmup(p,t);
+  let html =
+    '<div class="card accent"><h2>🅰️ План А — твоя гра</h2><p class="muted small">Від ударів, у яких ти впевнений'+(S.profile&&S.profile.name?", "+esc(S.profile.name):"")+".</p><ul class=\"clean\">" +
+    A.map(x=>"<li>"+esc(x.txt)+"</li>").join("") + "</ul></div>" +
+
+    '<div class="card"><h2>🅱️ План Б — якщо не йде</h2><p class="muted small">Коли План А не приносить очок 3–4 гейми поспіль.</p><ul class="clean">' +
+    B.map(x=>"<li>"+esc(x.txt)+"</li>").join("") + "</ul></div>" +
+
+    '<div class="card"><h2>🎯 Мікроцілі</h2><p class="muted small">Про процес, не про рахунок.</p><ul class="clean">' +
+    MG.map(x=>"<li>"+esc(x.txt)+"</li>").join("") + "</ul></div>";
+
+  html += '<div class="card"><h2>🏃 Розминка</h2>';
+  W.notes.forEach(n=>html+='<p class="small" style="color:var(--warn)">'+esc(n)+"</p>");
+  let wi = 0;
+  W.blocks.forEach(b=>{
+    html += "<h3>"+esc(b.name)+"</h3><div>";
+    b.items.forEach(itm=>{
+      const on = t.warmDone && t.warmDone[wi];
+      html += '<div class="check'+(on?" on":"")+'" data-w="'+wi+'"><div class="box">'+(on?"✓":"")+'</div><div class="txt">'+itm+"</div></div>";
+      wi++;
+    });
+    html += "</div>";
+  });
+  html += "</div>";
+  html += '<button class="btn primary" data-go="#/newmatch/'+t.id+'">Матч зіграно → записати результат</button>' +
+    '<p class="notice">У складний момент — кнопка SOS унизу екрана.</p>';
+  el.innerHTML = html;
+  $$("[data-w]").forEach(c=>c.onclick=()=>{
+    const i=c.dataset.w; t.warmDone=t.warmDone||{}; t.warmDone[i]=!t.warmDone[i]; save();
+    c.classList.toggle("on", t.warmDone[i]); $(".box",c).textContent = t.warmDone[i]? "✓":"";
+  });
+  $$("[data-go]").forEach(b=>b.onclick=()=>nav(b.dataset.go));
+}
+/* ============================================================
+   ЕКРАНИ (частина 2): матчі, перерви, SOS, завершення, звіт
+   ============================================================ */
+
+/* --- Вкладка: матчі --- */
+function tabMatches(t, el){
+  const ms = t.matches||[];
+  let html = "";
+  if(!ms.length){
+    html += '<div class="card center" style="padding:26px"><div class="bigicon">🎾</div>' +
+      "<h2>Поки без матчів</h2><p class=\"muted\">Після кожного матчу запиши результат за 1–2 хвилини — і отримаєш підказку на перерву.</p></div>";
+  }
+  ms.forEach((m,i)=>{
+    html += '<div class="card matchcard">' +
+      '<div class="wl '+(m.win?"w":"l")+'">'+(m.win?"П":"Пр")+"</div>" +
+      '<div class="grow"><div class="score">'+esc(m.score||"—")+"</div>" +
+      '<div class="muted small">Матч '+(i+1)+(m.opponent? " · "+esc(m.opponent):"")+(m.durMin? " · "+m.durMin+" хв":"")+"</div></div>" +
+      (m.planScore? '<span class="badge'+(m.planScore>=4?" ok":"")+'">план '+m.planScore+"/5</span>":"") +
+      "</div>";
+  });
+  if(t.status!=="done"){
+    html += '<button class="btn primary" id="mAdd">+ Записати матч</button>';
+    if(ms.length) html += '<button class="btn ghost" style="margin-top:10px" id="mFin">Завершити турнір → заминка і звіт</button>';
+  } else {
+    html += '<div class="notice">Турнір завершено. Звіт — у сусідній вкладці.</div>';
+  }
+  el.innerHTML = html;
+  const a=$("#mAdd"); if(a) a.onclick=()=>nav("#/newmatch/"+t.id);
+  const f=$("#mFin"); if(f) f.onclick=()=>nav("#/finish/"+t.id);
+}
+
+/* --- FR-04: форма після матчу --- */
+function scrMatchForm(t){
+  setTop("Після матчу", true);
+  const n = (t.matches||[]).length+1;
+  $("#app").innerHTML =
+    '<p class="muted" style="margin:0 4px 12px">Матч '+n+" · Швидко, за 1–2 хв. Деталі можна додати пізніше.</p>" +
+    '<div class="card"><h2>Результат</h2>' +
+      '<div class="field"><label>Підсумок</label>'+chipsInput("m_win",[{v:"w",label:"Перемога 🏆"},{v:"l",label:"Поразка"}],"")+"</div>" +
+      '<div class="grid2">' +
+        '<div class="field"><label>Рахунок</label><input class="input" id="m_score" maxlength="20" placeholder="напр., 6:4" inputmode="numeric"></div>' +
+        '<div class="field"><label>Тривалість, хв</label><input class="input" id="m_dur" type="number" min="10" max="240" inputmode="numeric" placeholder="60"></div>' +
+      "</div>" +
+      '<div class="field"><label>Суперник (ім’я/псевдонім, опційно)</label><input class="input" id="m_opp" maxlength="40"></div>' +
+    "</div>" +
+
+    '<div class="card"><h2>План і стан</h2>' +
+      '<div class="field"><label>Наскільки тримався плану</label>'+segInput("m_plan","")+'<div class="seglbl"><span>зовсім ні</span><span>чітко за планом</span></div></div>' +
+      '<div class="field"><label>Енергія</label>'+segInput("m_energy","")+"</div>" +
+      '<div class="field"><label>Гідратація (чи достатньо пив)</label>'+segInput("m_hyd","")+"</div>" +
+      '<div class="field"><label>М’язова втома (5 = дуже втомлений)</label>'+segInput("m_fat","")+"</div>" +
+      '<div class="field"><label>Емоційний стан</label>'+segInput("m_mood","")+"</div>" +
+    "</div>" +
+
+    '<div class="card"><h2>Деталі <span class="badge">опційно</span></h2>' +
+      '<div class="field"><label>Що спрацювало</label><input class="input" id="m_worked" maxlength="200" placeholder="напр., кручена подача у бекхенд"></div>' +
+      '<div class="field"><label>Що не спрацювало</label><input class="input" id="m_failed" maxlength="200"></div>' +
+      '<div class="field"><label>Один висновок</label><input class="input" id="m_note" maxlength="200" placeholder="одне речення"></div>' +
+      '<div class="field"><label>Суперник: стиль, що давало йому очки</label><input class="input" id="m_oppstyle" maxlength="200"></div>' +
+    "</div>" +
+
+    '<div class="card"><h2>Перерва до наступного матчу</h2>' +
+      chipsInput("m_break",[{v:"10",label:"~10 хв"},{v:"25",label:"20–30 хв"},{v:"70",label:"60+ хв"},{v:"last",label:"Це був останній"}],"") +
+    "</div>" +
+    '<button class="btn primary" id="mSave">Зберегти матч</button>';
+
+  bindPickers();
+  $("#mSave").onclick = ()=>{
+    const winV = chipVal("m_win");
+    if(!winV){ toast("Познач: перемога чи поразка"); return; }
+    const br = chipVal("m_break");
+    const m = {
+      id:uid(), ts:Date.now(), win:winV==="w", score:val("m_score"), durMin:num("m_dur"), opponent:val("m_opp"),
+      planScore:segVal("m_plan"), energy:segVal("m_energy"), hydration:segVal("m_hyd"),
+      fatigue:segVal("m_fat"), mood:segVal("m_mood"),
+      worked:val("m_worked"), failed:val("m_failed"), note:val("m_note"), oppStyle:val("m_oppstyle"),
+      breakMin: br==="last"? null : (br? +br : null), last: br==="last"
+    };
+    t.matches = t.matches||[]; t.matches.push(m); save();
+    toast("Збережено");
+    if(br==="last") nav("#/finish/"+t.id);
+    else nav("#/break/"+t.id+"/"+m.id);
+  };
+}
+
+/* --- FR-04: протокол перерви --- */
+function scrBreak(t, mid){
+  const arr = t.matches||[];
+  const m = arr.find(x=>x.id===mid) || arr[arr.length-1] || null;
+  const mins = (m && m.breakMin) || 25;
+  const proto = genBreakProtocol(mins, m, t, (t.matches||[]).length);
+  setTop("Перерва", true);
+  let html = '<div class="card accent"><h2>⏱️ '+esc(proto.title)+"</h2><ul class=\"clean\">" +
+    proto.steps.map(s=>"<li>"+esc(s)+"</li>").join("") + "</ul></div>";
+  proto.extra.forEach(x=>{
+    html += '<div class="card" style="border-color:rgba(255,198,92,.4)"><p style="margin:0;color:var(--warn)">'+esc(x.txt)+"</p></div>";
+  });
+  if(m && (+m.planScore||0)<=2){
+    const B = genPlanB(S.profile, t);
+    html += '<div class="card"><h2>🅱️ Нагадаю План Б</h2><ul class="clean">'+B.map(x=>"<li>"+esc(x.txt)+"</li>").join("")+"</ul></div>";
+  }
+  html += '<div class="btnrow"><button class="btn ghost" id="toGame">План гри</button>' +
+    '<button class="btn primary" id="nextM">Наступний матч →</button></div>' +
+    '<button class="btn ghost" style="margin-top:10px" id="fin">Завершити турнір</button>' +
+    '<p class="notice">Поради орієнтовні й не є медичними призначеннями.</p>';
+  $("#app").innerHTML = html;
+  $("#toGame").onclick = ()=>nav("#/t/"+t.id+"/game");
+  $("#nextM").onclick = ()=>nav("#/newmatch/"+t.id);
+  $("#fin").onclick = ()=>nav("#/finish/"+t.id);
+}
+
+/* ============================================================
+   FR-05: SOS — «Потрібна допомога зараз»
+   ============================================================ */
+function scrSOS(topic){
+  if(!topic){
+    setTop("Потрібна допомога зараз", true);
+    $("#app").innerHTML =
+      '<p class="muted" style="margin:2px 4px 14px">Що зараз відбувається? Один дотик — одна коротка дія.</p>' +
+      '<div class="sosbtns">' +
+      SOS_TOPICS.map(s=>'<button class="btn'+(s.danger?" outline-danger":"")+'" data-k="'+s.k+'"><span class="ic">'+s.ic+"</span>"+esc(s.label)+"</button>").join("") +
+      "</div>";
+    $$("[data-k]").forEach(b=>b.onclick=()=>nav("#/sos/"+b.dataset.k));
+    return;
+  }
+  const tip = sosTip(topic, S.profile);
+  const meta = SOS_TOPICS.find(x=>x.k===topic);
+  if(!tip){ nav("#/sos"); return; }
+  setTop(meta? meta.label : "Підказка", true);
+  const danger = !!tip.danger;
+  let html = '<div class="card '+(danger?"danger":"accent")+'" style="font-size:1.08rem;line-height:1.6">';
+  if(danger){
+    html += '<div class="bigicon">🚑</div><h2 style="color:var(--danger)">Спочатку безпека</h2>' +
+      "<p><b>"+esc(tip.action)+"</b></p><p>"+esc(tip.phrase)+"</p>";
+  } else {
+    html += (tip.breath? '<h3 style="margin-top:0">😮‍💨 Дихання</h3><p style="margin:4px 0 14px">'+esc(tip.breath)+"</p>" : "") +
+      '<h3>🎯 Одна дія</h3><p style="margin:4px 0 14px"><b>'+esc(tip.action)+"</b></p>" +
+      '<p class="muted" style="font-style:italic">'+esc(tip.phrase)+"</p>";
+  }
+  html += "</div>";
+  html += danger
+    ? '<button class="btn danger" id="ok0">Зрозуміло, зупиняюся</button>'
+    : '<div class="btnrow"><button class="btn primary" id="yes">Допомогло 👍</button><button class="btn ghost" id="no">Не дуже</button></div>' +
+      '<button class="btn ghost" style="margin-top:10px" id="back">Інша ситуація</button>';
+  $("#app").innerHTML = html;
+
+  function logIt(helpful){
+    const rec = {id:uid(), ts:Date.now(), trigger:topic, tipId:tip.id, helpful:helpful};
+    const a = activeT();
+    if(a){ a.interventions = a.interventions||[]; a.interventions.push(rec); } else { S.sosLog.push(rec); }
+    save();
+  }
+  const y=$("#yes"), n=$("#no"), b=$("#back"), o=$("#ok0");
+  if(y) y.onclick=()=>{ logIt(true); toast("Гарної гри! 🎾"); history.back(); };
+  if(n) n.onclick=()=>{ logIt(false); nav("#/sos"); };
+  if(b) b.onclick=()=>nav("#/sos");
+  if(o) o.onclick=()=>{ logIt(null); nav("#/home"); };
+}
+
+/* ============================================================
+   FR-06: завершення — заминка, аналіз, звіт
+   ============================================================ */
+function scrFinish(t){
+  setTop("Завершення турніру", true);
+  const cd = genCooldown(t);
+  const an = t.analysis||{};
+  $("#app").innerHTML =
+    '<div class="card accent"><h2>🧘 Заминка · '+esc(cd.dur)+"</h2>" +
+      '<p class="muted small">Залежить від зіграних матчів і втоми. Виконуй м’яко, без болю.</p>' +
+      '<ul class="clean">'+cd.items.map(i=>"<li>"+esc(i)+"</li>").join("")+"</ul></div>" +
+    '<div class="card"><h2>🔋 Відновлення сьогодні-завтра</h2><ul class="clean">' +
+      cd.recovery.map(i=>"<li>"+esc(i)+"</li>").join("")+"</ul>" +
+      '<p class="muted small">Не є медичними призначеннями. За болю чи поганого самопочуття — до лікаря.</p></div>' +
+
+    '<div class="card"><h2>📊 Короткий аналіз дня</h2>' +
+      '<div class="field"><label>Сон напередодні</label>'+segInput("a_sleep",an.sleep)+'<div class="seglbl"><span>погано</span><span>чудово</span></div></div>' +
+      '<div class="field"><label>Їжа та вода протягом дня</label>'+segInput("a_food",an.food)+"</div>" +
+      '<div class="field"><label>Розминка (якість/повнота)</label>'+segInput("a_warm",an.warmupScore)+"</div>" +
+      '<div class="field"><label>Впевненість у грі</label>'+segInput("a_conf",an.confidence)+"</div>" +
+      '<div class="field"><label>Задоволеність днем</label>'+segInput("a_sat",an.satisfaction)+"</div>" +
+      '<div class="field"><label>Як ти вигравав очки?</label><input class="input" id="a_won" maxlength="250" value="'+esc(an.wonBy)+'" placeholder="напр., глибина + кручена подача"></div>' +
+      '<div class="field"><label>Як ти програвав очки?</label><input class="input" id="a_lost" maxlength="250" value="'+esc(an.lostBy)+'" placeholder="напр., поспішав на прийомі"></div>' +
+    "</div>" +
+    '<button class="btn primary" id="mkReport">Сформувати звіт →</button>';
+
+  bindPickers();
+  $("#mkReport").onclick = ()=>{
+    t.analysis = {
+      sleep:segVal("a_sleep"), food:segVal("a_food"), warmupScore:segVal("a_warm"),
+      confidence:segVal("a_conf"), satisfaction:segVal("a_sat"),
+      wonBy:val("a_won"), lostBy:val("a_lost")
+    };
+    t.status = "done";
+    t.report = t.report || {createdAt:Date.now(), consent:false, focuses:[], custom:""};
+    t.report.insights = genInsights(t, S.profile);
+    save(); toast("Звіт готовий");
+    nav("#/t/"+t.id+"/report");
+  };
+}
+
+/* --- Вкладка: звіт --- */
+function tabReport(t, el){
+  if(!t.report){
+    el.innerHTML = '<div class="card center" style="padding:26px"><div class="bigicon">📄</div>' +
+      "<h2>Звіту ще немає</h2><p class=\"muted\">Заверши турнір — і я зберу підсумок: матчі, стан, висновки та фокуси на наступний раз.</p>" +
+      ((t.matches||[]).length? '<button class="btn primary" id="fin2">Завершити турнір</button>' : '<p class="muted small">Спершу запиши хоча б один матч.</p>') +
+      "</div>";
+    const f=$("#fin2"); if(f) f.onclick=()=>nav("#/finish/"+t.id);
+    return;
+  }
+  const r = t.report, ms = t.matches||[], an = t.analysis||{};
+  const w = ms.filter(m=>m.win===true).length, l = ms.filter(m=>m.win===false).length;
+  const sos = t.interventions||[];
+  let html = '<div class="card accent"><h2>Звіт: '+esc(t.name||"Турнір")+"</h2>" +
+    '<p class="muted small">'+esc(fmtDate(t.date))+" · "+(t.court==="open"?"відкритий корт":"зал")+", "+esc(t.surface||"")+(t.temp!=null? ", "+t.temp+"°C":"")+"</p>" +
+    '<div class="kv"><span>Матчі</span><b>'+w+" перемог · "+l+" поразок</b></div>" +
+    '<div class="kv"><span>Дотримання плану</span><b>'+r1(avg(ms.map(m=>+m.planScore||null)))+"/5</b></div>" +
+    '<div class="kv"><span>Енергія · Гідратація</span><b>'+r1(avg(ms.map(m=>+m.energy||null)))+" · "+r1(avg(ms.map(m=>+m.hydration||null)))+"/5</b></div>" +
+    '<div class="kv"><span>Впевненість · Задоволеність</span><b>'+(an.confidence||"—")+" · "+(an.satisfaction||"—")+"/5</b></div>" +
+    (sos.length? '<div class="kv"><span>SOS-підказки</span><b>'+sos.length+" (допомогли: "+sos.filter(i=>i.helpful===true).length+")</b></div>":"") +
+    "</div>";
+
+  html += '<div class="card"><h2>Матчі</h2>';
+  ms.forEach((m,i)=>{
+    html += '<div class="kv"><span>'+(i+1)+". "+esc(m.opponent||"Суперник")+(m.worked? ' <span class="muted small">— '+esc(m.worked)+"</span>":"")+"</span><b>"+(m.win?"✅ ":"❌ ")+esc(m.score||"")+"</b></div>";
+  });
+  html += "</div>";
+
+  if(an.wonBy || an.lostBy){
+    html += '<div class="card"><h2>Очки</h2>' +
+      (an.wonBy? "<p><b>Вигравав:</b> "+esc(an.wonBy)+"</p>":"") +
+      (an.lostBy? "<p><b>Програвав:</b> "+esc(an.lostBy)+"</p>":"") + "</div>";
+  }
+
+  html += '<div class="card"><h2>💡 Висновки</h2><ul class="clean">' +
+    (r.insights||[]).map(x=>"<li>"+esc(x)+"</li>").join("") + "</ul>" +
+    '<div class="field noprint" style="margin-top:10px"><label>Твій власний висновок</label><textarea class="input" id="r_custom" maxlength="400">'+esc(r.custom)+"</textarea></div>" +
+    (r.custom? '<p class="printonly"><b>Від гравця:</b> '+esc(r.custom)+"</p>":"") +
+    "</div>";
+
+  html += '<div class="card"><h2>🎯 Фокуси до наступного турніру</h2>' +
+    '<div class="chips" id="focusList" style="margin-bottom:10px">' +
+    (r.focuses||[]).map((f,i)=>'<button type="button" class="on" data-del="'+i+'">'+esc(f)+" ✕</button>").join("") + "</div>" +
+    '<div class="row noprint"><input class="input grow" id="r_focus" maxlength="80" placeholder="напр., друга подача з обертанням">' +
+    '<button class="btn sm primary" id="addFocus">+</button></div>' +
+    '<p class="hint">1–3 фокуси. Менше = краще.</p></div>';
+
+  html += '<div class="card noprint"><h2>Поділитися з тренером</h2>' +
+    '<div class="check'+(r.consent?" on":"")+'" id="consent"><div class="box">'+(r.consent?"✓":"")+'</div><div class="txt">Дозволяю поділитися цим звітом із тренером</div></div>' +
+    '<div class="btnrow"><button class="btn ghost" id="shCopy" '+(r.consent?"":"disabled")+'>Копіювати текст</button>' +
+    '<button class="btn ghost" id="shShare" '+(r.consent?"":"disabled")+'>Поділитися</button></div>' +
+    '<button class="btn primary" style="margin-top:10px" id="shPdf" '+(r.consent?"":"disabled")+'>Зберегти як PDF (друк)</button>' +
+    '<p class="hint">Звіт іде тільки туди, куди ти сам його надішлеш.</p></div>';
+
+  el.innerHTML = html;
+
+  const saveCustom = ()=>{ r.custom = val("r_custom"); save(); };
+  $("#r_custom").onchange = saveCustom;
+  $("#addFocus").onclick = ()=>{
+    const v = val("r_focus"); if(!v) return;
+    r.focuses = r.focuses||[];
+    if(r.focuses.length>=3){ toast("Максимум 3 фокуси"); return; }
+    r.focuses.push(v); save(); tabReport(t, el);
+  };
+  $$("#focusList [data-del]").forEach(b=>b.onclick=()=>{ r.focuses.splice(+b.dataset.del,1); save(); tabReport(t, el); });
+  $("#consent").onclick = ()=>{ r.consent = !r.consent; save(); tabReport(t, el); };
+  const doCopy = ()=>{ saveCustom(); const txt = reportText(t);
+    (navigator.clipboard? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>toast("Скопійовано"),()=>{ prompt("Скопіюй текст:", txt); });
+  };
+  $("#shCopy").onclick = doCopy;
+  $("#shShare").onclick = ()=>{ saveCustom(); const txt = reportText(t);
+    if(navigator.share) navigator.share({title:"Звіт: "+(t.name||"турнір"), text:txt}).catch(()=>{});
+    else doCopy();
+  };
+  $("#shPdf").onclick = ()=>{ saveCustom(); window.print(); };
+}
+
+function reportText(t){
+  const p = S.profile||{}, ms = t.matches||[], an = t.analysis||{}, r = t.report||{};
+  const w = ms.filter(m=>m.win===true).length, l = ms.filter(m=>m.win===false).length;
+  const L = [];
+  L.push("ЗВІТ ПРО ТУРНІР — " + (t.name||"Турнір"));
+  L.push(fmtDate(t.date) + " · " + (t.court==="open"?"відкритий корт":"зал") + ", " + (t.surface||"") + (t.temp!=null? ", "+t.temp+"°C":""));
+  if(p.name) L.push("Гравець: " + p.name + (p.level? " (NTRP "+p.level+")":""));
+  L.push("");
+  L.push("Результат: " + w + " перемог, " + l + " поразок");
+  ms.forEach((m,i)=>L.push("  " + (i+1) + ") " + (m.win?"W":"L") + " " + (m.score||"") + (m.opponent? " vs "+m.opponent:"") + (m.note? " — "+m.note:"")));
+  L.push("");
+  L.push("Дотримання плану: " + r1(avg(ms.map(m=>+m.planScore||null))) + "/5");
+  L.push("Енергія: " + r1(avg(ms.map(m=>+m.energy||null))) + "/5 · Гідратація: " + r1(avg(ms.map(m=>+m.hydration||null))) + "/5");
+  if(an.sleep) L.push("Сон напередодні: " + an.sleep + "/5 · Розминка: " + (an.warmupScore||"—") + "/5");
+  if(an.wonBy) L.push("Вигравав очки: " + an.wonBy);
+  if(an.lostBy) L.push("Програвав очки: " + an.lostBy);
+  L.push("");
+  L.push("Висновки:");
+  (r.insights||[]).forEach(x=>L.push("  • " + x));
+  if(r.custom) L.push("  • Від гравця: " + r.custom);
+  if((r.focuses||[]).length){ L.push(""); L.push("Фокуси до наступного турніру: " + r.focuses.join("; ")); }
+  L.push("");
+  L.push("Створено в застосунку «Персональний Тренер». Дані надані гравцем добровільно.");
+  return L.join("\n");
+}
+
+/* ============================================================
+   Дані та приватність
+   ============================================================ */
+function scrData(){
+  setTop("Мої дані", true);
+  $("#app").innerHTML =
+    '<div class="card"><h2>Приватність</h2><p class="muted">Усі дані зберігаються лише на цьому пристрої. Немає ні реєстрації, ні сервера. Звітом ділишся тільки ти сам.</p></div>' +
+    '<div class="card"><h2>Експорт</h2><p class="muted small">Збережи копію даних (JSON) — для перенесення чи бекапа.</p>' +
+      '<button class="btn ghost" id="exp">Завантажити мої дані</button></div>' +
+    '<div class="card"><h2>Імпорт</h2><p class="muted small">Віднови дані з файлу експорту.</p>' +
+      '<input type="file" id="impFile" accept=".json" style="display:none">' +
+      '<button class="btn ghost" id="imp">Обрати файл…</button></div>' +
+    '<div class="card danger"><h2>Видалення</h2><p class="muted small">Повне видалення профілю, турнірів і звітів із пристрою. Незворотно.</p>' +
+      '<button class="btn outline-danger" id="wipe">Видалити всі дані</button></div>';
+  $("#exp").onclick = ()=>{
+    const blob = new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "personal-trainer-data.json";
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  $("#imp").onclick = ()=>$("#impFile").click();
+  $("#impFile").onchange = e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const rd = new FileReader();
+    rd.onload = ()=>{
+      try{
+        const d = JSON.parse(rd.result);
+        if(d && d.v===1){ S = d; save(); toast("Дані відновлено"); nav("#/home"); }
+        else toast("Файл не схожий на експорт застосунку");
+      }catch(err){ toast("Не вдалося прочитати файл"); }
+    };
+    rd.readAsText(f);
+  };
+  $("#wipe").onclick = ()=>{
+    if(confirm("Точно видалити ВСІ дані з цього пристрою?") && confirm("Це незворотно. Видаляємо?")){
+      localStorage.removeItem(KEY); S = load(); toast("Дані видалено"); nav("#/home");
+    }
+  };
+}
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+window.addEventListener("hashchange", render);
+render();
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
