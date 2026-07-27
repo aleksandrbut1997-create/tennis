@@ -701,9 +701,9 @@ function scrHome(){
   let html = '<p style="font-size:1.25rem;font-weight:800;margin:2px 4px 12px">Привіт'+esc(name)+' 👋</p>';
 
   if(!a){
-    html += '<div class="card accent"><h2>Наступний крок</h2>' +
-      '<p class="muted">Додай турнір — і за хвилину отримаєш персональний план дня, тактику та чекліст.</p>' +
-      '<button class="btn primary" id="addT">+ Додати турнір</button></div>';
+    html += '<div class="card"><h2>Турнірів поки немає</h2>' +
+      '<p class="muted">Це не обов’язково: план дня, тактика і трекінг матчів з’являться, коли додаси турнір. Можеш зробити це просто зараз або пізніше — через вкладку «План» чи «Матчі».</p>' +
+      '<button class="btn ghost" id="addT">+ Додати турнір</button></div>';
   } else {
     const today = todayISO();
     const isToday = a.date===today, isPast = a.date<today;
@@ -755,7 +755,7 @@ function scrProfile(){
   const sk = p.skills||{};
   const scale = '<div class="seglbl"><span>1 — поки не впевнено</span><span>5 — дуже впевнено</span></div>';
   $("#app").innerHTML =
-    (first? '<div class="progress"><i style="width:33%"></i></div><p class="muted" style="margin-top:-8px">Крок 1 з 3 · Це займе ~2 хвилини. Усе можна змінити пізніше.</p>' : "") +
+    (first? '<div class="progress"><i style="width:50%"></i></div><p class="muted" style="margin-top:-8px">Крок 1 з 2 · Це займе ~2 хвилини. Усе можна змінити пізніше.</p>' : "") +
 
     '<div class="card"><h2>Основне</h2>' +
       '<div class="field"><label>Ім’я або псевдонім (опційно)</label><input class="input" id="f_name" maxlength="40" value="'+esc(p.name)+'" placeholder="Як до тебе звертатися"></div>' +
@@ -839,13 +839,13 @@ function scrProfile(){
   };
 }
 
-/* --- Підтвердження сильних сторін (онбординг, крок 2) --- */
+/* --- Підтвердження сильних сторін (онбординг, крок 2 з 2) --- */
 function scrStrengths(){
   const p = S.profile; if(!p) return nav("#/profile");
   setTop("Твої сильні сторони", true);
   const strong = strongSkills(p);
   $("#app").innerHTML =
-    '<div class="progress"><i style="width:66%"></i></div>' +
+    '<div class="progress"><i style="width:100%"></i></div>' +
     '<div class="card accent"><h2>Ось від чого будуватимемо тактику</h2>' +
       '<div class="chips" style="margin:10px 0">' + strong.map(s=>'<button type="button" class="on" style="pointer-events:none">'+esc(s.label)+" · "+s.v+"/5</button>").join("") + "</div>" +
       (p.selfDesc? '<p class="muted small">Ти про себе: «'+esc(p.selfDesc)+'»</p>' : "") +
@@ -853,7 +853,7 @@ function scrStrengths(){
     "</div>" +
     '<button class="btn primary" id="ok">Усе так, продовжити</button>' +
     '<button class="btn ghost" style="margin-top:10px" id="fix">Виправити оцінки</button>';
-  $("#ok").onclick = ()=>nav(S.tournaments.length? "#/home" : "#/tnew");
+  $("#ok").onclick = ()=>nav("#/home");
   $("#fix").onclick = ()=>nav("#/profile");
 }
 
@@ -866,7 +866,7 @@ function scrTournForm(t){
   setTop(isNew? "Новий турнір" : "Редагувати турнір", true);
   const f = t.format||{};
   $("#app").innerHTML =
-    (isNew && S.tournaments.length===0 ? '<div class="progress"><i style="width:100%"></i></div><p class="muted" style="margin-top:-8px">Крок 3 з 3 · Після збереження отримаєш план дня.</p>':"") +
+    (isNew ? '<p class="muted" style="margin-top:-4px">Після збереження отримаєш план дня, тактику й чекліст під цей турнір.</p>':"") +
     '<div class="card"><h2>Коли і де</h2>' +
       '<div class="field"><label>Назва (опційно)</label><input class="input" id="t_name" maxlength="60" value="'+esc(t.name)+'" placeholder="напр., Кубок клубу"></div>' +
       '<div class="grid2">' +
