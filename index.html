@@ -312,12 +312,12 @@ function load(){
       const d = JSON.parse(raw);
       if(d && d.v===1){
         d.matches = d.matches||[]; d.trainings = d.trainings||[]; d.sosLog = d.sosLog||[];
-        d.opponents = d.opponents||[]; d.skillHistory = d.skillHistory||[]; d.goals = d.goals||[];
+        d.opponents = d.opponents||[]; d.skillHistory = d.skillHistory||[]; d.goals = d.goals||[]; d.challenges = d.challenges||[];
         return d;
       }
     }
   }catch(e){}
-  return { v:1, profile:null, tournaments:[], sosLog:[], matches:[], trainings:[], opponents:[], skillHistory:[], goals:[] };
+  return { v:1, profile:null, tournaments:[], sosLog:[], matches:[], trainings:[], opponents:[], skillHistory:[], goals:[], challenges:[] };
 }
 function recordSkillSnapshot(skills){
   const prevEntry = (S.skillHistory||[])[S.skillHistory.length-1];
@@ -358,6 +358,7 @@ function getSM(id){ return (S.matches||[]).find(m=>m.id===id) || null; }
 function getTrain(id){ return (S.trainings||[]).find(x=>x.id===id) || null; }
 function getOpp(id){ return (S.opponents||[]).find(o=>o.id===id) || null; }
 function getGoal(id){ return (S.goals||[]).find(g=>g.id===id) || null; }
+function getChallenge(id){ return (S.challenges||[]).find(c=>c.id===id) || null; }
 
 /* --- Пікер суперника: автопідстановка збережених + збереження нового --- */
 function opponentPickerHTML(fieldId, checkboxId, currentName, label){
@@ -450,6 +451,38 @@ const RACKET_GRIPS = [
 /* ---------- Окремі матчі (поза турніром) ---------- */
 const MATCH_TYPES = [{v:"sparring",label:"Спаринг"},{v:"friendly",label:"Товариська"},{v:"league",label:"Ліга/чемпіонат"}];
 const MATCH_FORMATS = [{v:"singles",label:"Одиночна"},{v:"doubles",label:"Парна"}];
+
+/* ---------- Розвиток: цілі й челенджі ---------- */
+const GOAL_TEMPLATES = [
+  "Виграти турнір рівня 500",
+  "Виграти матч з рахунком 6:0",
+  "Дійти до фіналу турніру",
+  "Підняти рейтинг до 600",
+  "Вийти на NTRP 4.0"
+];
+const CHALLENGE_TEMPLATES = [
+  {title:"Виграй 5 очок зі смешу за матч", target:5, skill:"smash"},
+  {title:"Вибий 5 ейсів за матч", target:5, skill:"srvFlat"},
+  {title:"Зроби 3 вдалих виходи до сітки поспіль", target:3, skill:"net"},
+  {title:"Виграй розіграш укороченим ударом 3 рази за матч", target:3, skill:"drop"},
+  {title:"Виграй 10 очок різаним ударом за матч", target:10, skill:"slice"},
+  {title:"Заверши матч без жодної подвійної помилки", target:1, skill:"srvKick"},
+  {title:"Виграй 5 очок після виходу до сітки", target:5, skill:"net"},
+  {title:"Тримай першу подачу в корт 8 разів поспіль", target:8, skill:"srvFlat"},
+  {title:"Виграй 3 гейми поспіль на своїй подачі", target:3},
+  {title:"Зроби 5 переходів на План Б і виграй гейм після цього", target:5}
+];
+function suggestChallenges(p){
+  const rated = skillsRated(p);
+  const weakKeys = rated.filter(s=>s.v>0 && s.v<=3).map(s=>s.k);
+  const pool = CHALLENGE_TEMPLATES.slice();
+  pool.sort((a,b)=>{
+    const aw = a.skill && weakKeys.includes(a.skill) ? 0 : 1;
+    const bw = b.skill && weakKeys.includes(b.skill) ? 0 : 1;
+    return aw-bw;
+  });
+  return pool.slice(0,3);
+}
 
 /* ---------- Тренування ---------- */
 const TRAIN_FORMAT = [{v:"group",label:"Групове"},{v:"individual",label:"Індивідуальне"}];
@@ -948,9 +981,13 @@ function render(){
   if(p[0]==="opponentnew") return scrOpponentForm(null);
   if(p[0]==="opponentedit" && getOpp(p[1])) return scrOpponentForm(getOpp(p[1]));
   if(p[0]==="opponent" && getOpp(p[1])) return scrOpponentView(getOpp(p[1]));
+  if(p[0]==="dev") return scrDevHub();
   if(p[0]==="goals") return scrGoalsList();
   if(p[0]==="goalnew") return scrGoalForm(null);
   if(p[0]==="goaledit" && getGoal(p[1])) return scrGoalForm(getGoal(p[1]));
+  if(p[0]==="challenges") return scrChallengesList();
+  if(p[0]==="challengenew") return scrChallengeForm(null);
+  if(p[0]==="challengeedit" && getChallenge(p[1])) return scrChallengeForm(getChallenge(p[1]));
   if(p[0]==="strengths") return scrStrengths();
   if(p[0]==="tnew") return scrTournForm(null);
   if(p[0]==="tedit") return scrTournForm(getT(p[1]));
@@ -1407,13 +1444,13 @@ function scrProfileView(){
     '<button class="btn primary" id="editP">Редагувати профіль</button>' +
     '<button class="btn ghost" style="margin-top:10px" id="progressBtn">Прогрес ударів у часі</button>' +
     '<button class="btn ghost" style="margin-top:10px" id="oppBtn">Суперники</button>' +
-    '<button class="btn ghost" style="margin-top:10px" id="goalsBtn">Цілі</button>' +
+    '<button class="btn ghost" style="margin-top:10px" id="devBtn">Розвиток (цілі й челенджі)</button>' +
     '<button class="btn ghost" style="margin-top:10px" id="goData">Мої дані та приватність</button>';
 
   $("#editP").onclick = ()=>nav("#/profileedit");
   $("#progressBtn").onclick = ()=>nav("#/progress");
   $("#oppBtn").onclick = ()=>nav("#/opponents");
-  $("#goalsBtn").onclick = ()=>nav("#/goals");
+  $("#devBtn").onclick = ()=>nav("#/dev");
   $("#goData").onclick = ()=>nav("#/data");
 }
 
@@ -1530,6 +1567,25 @@ function scrOpponentView(opp){
 }
 
 /* ============================================================
+   РОЗВИТОК (хаб: цілі, челенджі — і місце для майбутніх розділів)
+   ============================================================ */
+function scrDevHub(){
+  setTop("Розвиток", true);
+  const openGoals = (S.goals||[]).filter(g=>!g.done).length;
+  const openCh = (S.challenges||[]).filter(c=>!c.done).length;
+  $("#app").innerHTML =
+    '<div class="card accent" style="cursor:pointer" data-href="#/goals"><h2>🎯 Цілі</h2>' +
+      '<p class="muted small">Довгострокові й конкретні: виграти турнір рівня 500, виграти матч 6:0, підняти рейтинг.</p>' +
+      (openGoals? '<span class="badge lime">'+openGoals+" активних</span>":"") +
+    "</div>" +
+    '<div class="card" style="cursor:pointer" data-href="#/challenges"><h2>⚡ Челенджі</h2>' +
+      '<p class="muted small">Короткі виклики на найближчий матч чи тренування: 5 очок зі смешу, 5 ейсів і подібне. Система підкаже або створи свій.</p>' +
+      (openCh? '<span class="badge">'+openCh+" активних</span>":"") +
+    "</div>";
+  $$("[data-href]").forEach(el=>el.onclick=()=>nav(el.dataset.href));
+}
+
+/* ============================================================
    СЕЗОННІ ЦІЛІ
    ============================================================ */
 function activitySince(ts){
@@ -1575,8 +1631,10 @@ function scrGoalForm(g){
   const isNew = !g; g = g || {};
   setTop(isNew? "Нова ціль":"Редагувати ціль", true);
   $("#app").innerHTML =
+    (isNew? '<div class="card"><h2>Приклади</h2><p class="muted small">Тисни, щоб підставити в поле «Ціль», і відредагуй під себе.</p>' +
+      '<div class="chips" id="gTemplates">'+GOAL_TEMPLATES.map(t=>'<button type="button" data-t="'+esc(t)+'">'+esc(t)+"</button>").join("")+"</div></div>" : "") +
     '<div class="card">' +
-      '<div class="field"><label>Ціль</label><input class="input" id="g_title" maxlength="120" value="'+esc(g.title)+'" placeholder="напр., вийти на NTRP 4.0"></div>' +
+      '<div class="field"><label>Ціль</label><input class="input" id="g_title" maxlength="120" value="'+esc(g.title)+'" placeholder="напр., виграти турнір рівня 500"></div>' +
       '<div class="field"><label>Дедлайн (опційно)</label><input class="input" id="g_date" type="date" value="'+esc(g.targetDate)+'"></div>' +
       '<div class="field"><label>Нотатки (опційно)</label><textarea class="input" id="g_notes" maxlength="400">'+esc(g.notes)+"</textarea></div>" +
       (isNew? "" : '<div class="field"><label>Статус</label>'+chipsInput("g_done",[{v:"open",label:"У процесі"},{v:"done",label:"Досягнуто ✅"}],g.done?"done":"open")+"</div>") +
@@ -1584,6 +1642,8 @@ function scrGoalForm(g){
     '<button class="btn primary" id="gSave">'+(isNew?"Зберегти ціль":"Зберегти зміни")+"</button>" +
     (isNew? "" : '<button class="btn outline-danger" style="margin-top:10px" id="gDel">Видалити ціль</button>');
   bindPickers();
+  const gt = $("#gTemplates");
+  if(gt) gt.onclick = e=>{ const b=e.target.closest("button"); if(b) $("#g_title").value = b.dataset.t; };
   $("#gSave").onclick = ()=>{
     const title = val("g_title");
     if(!title){ toast("Опиши ціль"); return; }
@@ -1600,6 +1660,111 @@ function scrGoalForm(g){
   const del = $("#gDel");
   if(del) del.onclick = ()=>{
     if(confirm("Видалити цю ціль?")){ S.goals = S.goals.filter(x=>x.id!==g.id); save(); nav("#/goals"); }
+  };
+}
+
+/* ============================================================
+   ЧЕЛЕНДЖІ
+   ============================================================ */
+function scrChallengesList(){
+  setTop("Челенджі", true);
+  const all = (S.challenges||[]).slice().sort((a,b)=>(b.createdTs||0)-(a.createdTs||0));
+  const active = all.filter(c=>!c.done), done = all.filter(c=>c.done);
+  const suggestions = active.length<3 ? suggestChallenges(S.profile).filter(t=>!active.some(c=>c.title===t.title)) : [];
+
+  let html = '<button class="btn primary" id="addCh">+ Свій челендж</button>';
+
+  if(suggestions.length){
+    html += '<div class="card" style="margin-top:12px"><h2>Пропозиції</h2><p class="muted small">На основі твого профілю — тисни, щоб додати.</p>';
+    suggestions.forEach((s,i)=>{
+      html += '<button type="button" class="btn ghost" style="margin-top:8px;justify-content:flex-start" data-sugg="'+i+'">⚡ '+esc(s.title)+(s.target? " · ціль "+s.target:"")+"</button>";
+    });
+    html += "</div>";
+  }
+
+  if(!active.length && !done.length){
+    html += '<p class="muted" style="margin-top:14px">Короткі виклики на найближчий матч чи тренування — обери пропозицію вище або створи свій.</p>';
+  }
+  if(active.length){
+    html += '<h2 style="font-size:1rem;margin:18px 4px 8px">Активні</h2>';
+    active.forEach(c=>{
+      html += '<div class="card" style="margin-top:10px"><div class="row">' +
+        '<div class="grow"><b>'+esc(c.title)+"</b>" +
+        (c.target? '<div class="muted small">Прогрес: '+(c.progress||0)+" / "+c.target+"</div>" : "") +
+        "</div></div>" +
+        '<div class="btnrow" style="margin-top:10px">' +
+        (c.target? '<button class="btn ghost" data-plus="'+c.id+'">+1</button>' : "") +
+        '<button class="btn primary" data-done="'+c.id+'">Готово ✅</button>' +
+        '<button class="btn outline-danger" data-del="'+c.id+'" style="flex:none;width:44px">✕</button>' +
+        "</div></div>";
+    });
+  }
+  if(done.length){
+    html += '<h2 style="font-size:1rem;margin:18px 4px 8px">Виконані</h2>';
+    done.forEach(c=>{
+      html += '<div class="card"><div class="row"><div class="grow"><b>✅ '+esc(c.title)+'</b>' +
+        (c.doneTs? '<div class="muted small">'+esc(fmtDate(new Date(c.doneTs).toISOString().slice(0,10)))+"</div>":"") +
+        "</div>" +
+        '<button class="btn outline-danger" data-del="'+c.id+'" style="flex:none;width:44px">✕</button>' +
+      "</div></div>";
+    });
+  }
+
+  $("#app").innerHTML = html;
+  $("#addCh").onclick = ()=>nav("#/challengenew");
+  $$("[data-sugg]").forEach(b=>{
+    b.onclick = ()=>{
+      const s = suggestions[+b.dataset.sugg];
+      const nc = {id:uid(), title:s.title, target:s.target||null, progress:0, done:false, source:"system", createdTs:Date.now()};
+      S.challenges = S.challenges||[]; S.challenges.push(nc); save(); toast("Додано"); render();
+    };
+  });
+  $$("[data-plus]").forEach(b=>{
+    b.onclick = ()=>{
+      const c = getChallenge(b.dataset.plus); if(!c) return;
+      c.progress = (c.progress||0)+1;
+      if(c.progress>=c.target){ c.done=true; c.doneTs=Date.now(); toast("Челендж виконано! 🎉"); }
+      save(); render();
+    };
+  });
+  $$("[data-done]").forEach(b=>{
+    b.onclick = ()=>{
+      const c = getChallenge(b.dataset.done); if(!c) return;
+      c.done = true; c.doneTs = Date.now(); save(); toast("Челендж виконано! 🎉"); render();
+    };
+  });
+  $$("[data-del]").forEach(b=>{
+    b.onclick = ()=>{
+      S.challenges = (S.challenges||[]).filter(x=>x.id!==b.dataset.del); save(); render();
+    };
+  });
+}
+function scrChallengeForm(ch){
+  const isNew = !ch; ch = ch || {};
+  setTop(isNew? "Свій челендж":"Редагувати челендж", true);
+  $("#app").innerHTML =
+    '<div class="card">' +
+      '<div class="field"><label>Челендж</label><input class="input" id="c_title" maxlength="120" value="'+esc(ch.title)+'" placeholder="напр., виграй 5 очок зі смешу"></div>' +
+      '<div class="field"><label>Ціль у числі (опційно)</label><input class="input" id="c_target" type="number" min="1" max="99" inputmode="numeric" value="'+esc(ch.target)+'" placeholder="напр., 5"><div class="hint">Порожньо — просто позначиш «Готово» вручну.</div></div>' +
+    "</div>" +
+    '<button class="btn primary" id="cSave">'+(isNew?"Додати челендж":"Зберегти зміни")+"</button>" +
+    (isNew? "" : '<button class="btn outline-danger" style="margin-top:10px" id="cDel">Видалити</button>');
+  $("#cSave").onclick = ()=>{
+    const title = val("c_title");
+    if(!title){ toast("Опиши челендж"); return; }
+    const target = num("c_target");
+    if(isNew){
+      const nc = {id:uid(), title, target:target||null, progress:0, done:false, source:"custom", createdTs:Date.now()};
+      S.challenges = S.challenges||[]; S.challenges.push(nc); save(); toast("Челендж додано");
+    } else {
+      ch.title = title; ch.target = target||null;
+      save(); toast("Оновлено");
+    }
+    nav("#/challenges");
+  };
+  const del = $("#cDel");
+  if(del) del.onclick = ()=>{
+    if(confirm("Видалити цей челендж?")){ S.challenges = S.challenges.filter(x=>x.id!==ch.id); save(); nav("#/challenges"); }
   };
 }
 
