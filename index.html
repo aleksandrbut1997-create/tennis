@@ -312,11 +312,21 @@ function load(){
       const d = JSON.parse(raw);
       if(d && d.v===1){
         d.matches = d.matches||[]; d.trainings = d.trainings||[]; d.sosLog = d.sosLog||[];
+        d.opponents = d.opponents||[]; d.skillHistory = d.skillHistory||[]; d.goals = d.goals||[];
         return d;
       }
     }
   }catch(e){}
-  return { v:1, profile:null, tournaments:[], sosLog:[], matches:[], trainings:[] };
+  return { v:1, profile:null, tournaments:[], sosLog:[], matches:[], trainings:[], opponents:[], skillHistory:[], goals:[] };
+}
+function recordSkillSnapshot(skills){
+  const prevEntry = (S.skillHistory||[])[S.skillHistory.length-1];
+  const prev = prevEntry ? prevEntry.skills : {};
+  const changed = ALL_SKILLS.some(s=> (prev[s.k]||0) !== (skills[s.k]||0));
+  if(changed){
+    S.skillHistory = S.skillHistory||[];
+    S.skillHistory.push({ ts:Date.now(), date:todayISO(), skills:Object.assign({}, skills) });
+  }
 }
 function save(sync){
   try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Не вдалося зберегти дані"); }
@@ -346,6 +356,64 @@ function nav(h){ location.hash = h; }
 function getT(id){ return S.tournaments.find(t=>t.id===id) || null; }
 function getSM(id){ return (S.matches||[]).find(m=>m.id===id) || null; }
 function getTrain(id){ return (S.trainings||[]).find(x=>x.id===id) || null; }
+function getOpp(id){ return (S.opponents||[]).find(o=>o.id===id) || null; }
+
+/* --- Пікер суперника: автопідстановка збережених + збереження нового --- */
+function opponentPickerHTML(fieldId, checkboxId, currentName, label){
+  const opts = (S.opponents||[]).map(o=>'<option value="'+esc(o.name)+'">').join("");
+  return '<div class="field"><label>'+(label||"Суперник (ім’я, опційно)")+'</label>' +
+    '<input class="input" id="'+fieldId+'" list="'+fieldId+'_list" maxlength="60" autocomplete="off" value="'+esc(currentName||"")+'">' +
+    '<datalist id="'+fieldId+'_list">'+opts+'</datalist>' +
+    '<p class="hint" id="'+fieldId+'_hint" style="display:none"></p>' +
+    '<label class="hint" style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer">' +
+      '<input type="checkbox" id="'+checkboxId+'" style="width:18px;height:18px;flex:none"> Зберегти суперника для наступного разу' +
+    "</label></div>";
+}
+function bindOpponentPicker(fieldId){
+  const inp = $("#"+fieldId); if(!inp) return;
+  const hint = $("#"+fieldId+"_hint");
+  const check = ()=>{
+    const v = inp.value.trim().toLowerCase();
+    const found = v ? (S.opponents||[]).find(o=>o.name.trim().toLowerCase()===v) : null;
+    if(found){
+      inp.dataset.matchedId = found.id;
+      hint.style.display = "block"; hint.classList.add("ok");
+      hint.textContent = "Знайдено збереженого суперника «"+found.name+"» — використаємо його історію.";
+    } else {
+      delete inp.dataset.matchedId;
+      hint.style.display = "none"; hint.classList.remove("ok");
+    }
+  };
+  inp.addEventListener("input", check);
+  check();
+}
+function resolveOpponent(fieldId, checkboxId){
+  const name = val(fieldId);
+  if(!name) return null;
+  const inp = $("#"+fieldId);
+  const matchedId = inp && inp.dataset.matchedId;
+  if(matchedId){
+    const opp = getOpp(matchedId);
+    if(opp){ opp.updatedTs = Date.now(); return opp.id; }
+  }
+  const wantSave = $("#"+checkboxId) && $("#"+checkboxId).checked;
+  if(wantSave){
+    const opp = {id:uid(), name, notes:"", createdTs:Date.now(), updatedTs:Date.now()};
+    S.opponents = S.opponents||[]; S.opponents.push(opp);
+    return opp.id;
+  }
+  return null;
+}
+function matchesForOpponent(id){
+  const standalone = (S.matches||[]).filter(m=>m.opponentId===id||m.opponentId2===id).map(m=>Object.assign({_kind:"standalone"}, m));
+  const fromT = [];
+  (S.tournaments||[]).forEach(t=>{
+    (t.matches||[]).forEach(m=>{
+      if(m.opponentId===id||m.opponentId2===id) fromT.push(Object.assign({_kind:"tournament", _tName:t.name, _tId:t.id}, m));
+    });
+  });
+  return standalone.concat(fromT).sort((a,b)=>(b.ts||0)-(a.ts||0));
+}
 function activeT(){
   const open = S.tournaments.filter(t=>t.status!=="done").sort((a,b)=>(a.date||"").localeCompare(b.date||""));
   return open[0] || null;
@@ -398,7 +466,8 @@ const PLAYSTYLES = [
   {v:"aggressive", label:"Агресивний бомбардир", desc:"Диктую темп, граю на випередження, завершую в 1–2 ударах"},
   {v:"allcourt",   label:"Універсал (задня лінія + сітка)", desc:"Комфортно і глибоко, і біля сітки, люблю різноманітність"},
   {v:"counter",    label:"Контратакувальник / ретрівер", desc:"Стабільний, багато повертаю, чекаю на помилку суперника"},
-  {v:"serve",      label:"Ставка на подачу", desc:"Головна зброя — перша подача і швидка атака після неї"}
+  {v:"serve",      label:"Ставка на подачу", desc:"Головна зброя — перша подача і швидка атака після неї"},
+  {v:"unsure",     label:"Ще не визначився / формується", desc:"Це нормально на початку — повернешся сюди, коли стиль стане зрозумілішим"}
 ];
 const TENDENCY_TAGS = [
   {v:"nervous_bp",  label:"Нервую на важливих очках (брейк-пойнти)"},
@@ -633,6 +702,7 @@ function strongSkills(p){
   const strong = rated.filter(s=>s.v>=4);
   return strong.length? strong : rated.slice(0,2);
 }
+function hasStrength(p){ return skillsRated(p).some(s=>s.v>=4); }
 function stableStroke(p){
   const ground = skillsRated(p).filter(s=>["fh","bh","slice"].includes(s.k)).sort((a,b)=>b.v-a.v);
   return ground[0] || null;
@@ -871,6 +941,11 @@ function render(){
   if(p[0]==="trainview" && getTrain(p[1])) return scrTrainingView(getTrain(p[1]));
   if(p[0]==="profile") return scrProfile();
   if(p[0]==="profileedit") return scrProfileEdit();
+  if(p[0]==="progress") return scrSkillProgress();
+  if(p[0]==="opponents") return scrOpponentsList();
+  if(p[0]==="opponentnew") return scrOpponentForm(null);
+  if(p[0]==="opponentedit" && getOpp(p[1])) return scrOpponentForm(getOpp(p[1]));
+  if(p[0]==="opponent" && getOpp(p[1])) return scrOpponentView(getOpp(p[1]));
   if(p[0]==="strengths") return scrStrengths();
   if(p[0]==="tnew") return scrTournForm(null);
   if(p[0]==="tedit") return scrTournForm(getT(p[1]));
@@ -955,8 +1030,10 @@ function scrStandaloneMatchPrep(){
   setTop("Матч — твоя гра", true);
   const A = genPlanA(p).slice(0,3);
   const rkTip = racketInsight(p);
+  const noStrength = !hasStrength(p);
   $("#app").innerHTML =
     '<p class="muted" style="margin:0 4px 12px">Коротка тактика перед грою — без турнірної логістики.</p>' +
+    (noStrength? '<p class="muted small" style="color:var(--warn);margin:0 4px 12px">Поки жоден удар не оцінений на 4–5 — це твої відносно сильніші сторони на сьогодні, а не готова зброя.</p>' : "") +
     '<div class="card accent"><h2>🅰️ Твоя гра</h2><ul class="clean">' +
       A.map(x=>"<li>"+esc(x.txt)+"</li>").join("") + (rkTip? "<li>"+esc(rkTip.txt)+"</li>" : "") +
     "</ul></div>" +
@@ -974,7 +1051,7 @@ function scrStandaloneMatchForm(){
       '<div class="field"><label>Тип</label>'+chipsInput("m_type", MATCH_TYPES, "sparring")+"</div>" +
       '<div class="field"><label>Покриття</label><select class="input" id="m_surface">'+
         SURFACES.map(o=>'<option'+(o==="Хард"?" selected":"")+">"+o+"</option>").join("")+"</select></div>" +
-      '<div class="field"><label>Суперник (ім’я/псевдонім, опційно)</label><input class="input" id="m_opp" maxlength="40"></div>' +
+      opponentPickerHTML("m_opp","m_oppsave") +
       '<div class="field"><label>Про суперника: стиль, сильні/слабкі сторони</label><input class="input" id="m_oppstyle" maxlength="200" placeholder="напр., слабкий бекхенд, часто йде до сітки"></div>' +
     "</div>" +
     '<div class="card"><h2>Результат</h2>' +
@@ -999,13 +1076,15 @@ function scrStandaloneMatchForm(){
     '<button class="btn primary" id="mSave">Зберегти матч</button>';
 
   bindPickers();
+  bindOpponentPicker("m_opp");
   $("#mSave").onclick = ()=>{
     const winV = chipVal("m_win");
     if(!winV){ toast("Познач: перемога чи поразка"); return; }
+    const opponentId = resolveOpponent("m_opp","m_oppsave");
     const m = {
       id:uid(), ts:Date.now(), date:val("m_date")||todayISO(), type:chipVal("m_type")||"sparring", surface:val("m_surface"),
       win:winV==="w", score:val("m_score"), durMin:num("m_dur"),
-      opponent:val("m_opp"), oppStyle:val("m_oppstyle"),
+      opponent:val("m_opp"), opponentId, oppStyle:val("m_oppstyle"),
       planScore:segVal("m_plan"), energy:segVal("m_energy"), hydration:segVal("m_hyd"),
       fatigue:segVal("m_fat"), mood:segVal("m_mood"),
       worked:val("m_worked"), failed:val("m_failed"), note:val("m_note")
@@ -1189,7 +1268,10 @@ function scrHome(){
   }
   const recentMatches = (S.matches||[]).slice().sort((x,y)=>(y.ts||0)-(x.ts||0)).slice(0,5);
   if(recentMatches.length){
-    html += '<h2 style="font-size:1rem;margin:18px 4px 8px">Останні матчі</h2>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 4px 8px">' +
+      '<h2 style="font-size:1rem;margin:0">Останні матчі</h2>' +
+      ((S.opponents||[]).length? '<a href="#/opponents" style="color:var(--accent);font-size:.85rem;font-weight:600;text-decoration:none">Суперники →</a>' : "") +
+    "</div>";
     recentMatches.forEach(m=>{
       const typeLabel = (MATCH_TYPES.find(x=>x.v===m.type)||{}).label || "Матч";
       html += '<div class="card" style="cursor:pointer" data-href="#/matchview/'+m.id+'"><div class="row">' +
@@ -1258,7 +1340,7 @@ function scrProfileView(){
     "</div>" +
 
     '<div class="card"><h2>Досвід і рівень</h2>' +
-      '<div class="stat"><span>Років у тенісі</span><b>'+esc(p.years||"—")+'</b></div>' +
+      '<div class="stat"><span>Стаж у тенісі</span><b>'+((p.years||p.months)? ((p.years?p.years+" р":"")+" "+(p.months?p.months+" міс":"")).trim() : "—")+'</b></div>' +
       '<div class="stat"><span>Граю зазвичай</span><b>'+esc(p.freq||"—")+'</b></div>' +
       '<div class="stat"><span>Рівень (NTRP)</span><b>'+esc(p.level||"—")+'</b></div>' +
       '<div class="stat"><span>Рейтинг у лізі</span><b>'+esc(p.rating||"—")+'</b></div>' +
@@ -1287,10 +1369,126 @@ function scrProfileView(){
     "</div>" +
 
     '<button class="btn primary" id="editP">Редагувати профіль</button>' +
+    '<button class="btn ghost" style="margin-top:10px" id="progressBtn">Прогрес ударів у часі</button>' +
+    '<button class="btn ghost" style="margin-top:10px" id="oppBtn">Суперники</button>' +
     '<button class="btn ghost" style="margin-top:10px" id="goData">Мої дані та приватність</button>';
 
   $("#editP").onclick = ()=>nav("#/profileedit");
+  $("#progressBtn").onclick = ()=>nav("#/progress");
+  $("#oppBtn").onclick = ()=>nav("#/opponents");
   $("#goData").onclick = ()=>nav("#/data");
+}
+
+/* ============================================================
+   ПРОГРЕС УДАРІВ У ЧАСІ
+   ============================================================ */
+function scrSkillProgress(){
+  setTop("Прогрес ударів", true);
+  const hist = (S.skillHistory||[]).slice().sort((a,b)=>a.ts-b.ts);
+  if(hist.length<2){
+    $("#app").innerHTML = '<div class="card"><p class="muted">Поки замало даних для прогресу. Знімок зберігається щоразу, коли змінюються оцінки ударів у профілі — онови їх ще раз пізніше, щоб побачити зміну.</p></div>';
+    return;
+  }
+  const first = hist[0], last = hist[hist.length-1];
+  let html = '<p class="muted small" style="margin:0 4px 12px">'+esc(fmtDate(first.date))+" → "+esc(fmtDate(last.date))+" · записів: "+hist.length+"</p>" +
+    '<div class="card">';
+  ALL_SKILLS.forEach(s=>{
+    const v0 = first.skills[s.k]||0, v1 = last.skills[s.k]||0;
+    if(!v0 && !v1) return;
+    const diff = v1-v0;
+    const arrow = diff>0? "▲" : diff<0? "▼" : "=";
+    const color = diff>0? "var(--ok)" : diff<0? "var(--danger)" : "var(--muted)";
+    html += '<div class="stat"><span>'+esc(s.label)+'</span><b>'+(v0||"—")+" → "+(v1||"—")+' <span style="color:'+color+'">'+arrow+(diff!==0?" "+Math.abs(diff):"")+'</span></b></div>';
+  });
+  html += "</div>";
+  $("#app").innerHTML = html;
+}
+
+/* ============================================================
+   СУПЕРНИКИ
+   ============================================================ */
+function scrOpponentsList(){
+  setTop("Суперники", true);
+  const opps = (S.opponents||[]).slice().sort((a,b)=>(b.updatedTs||0)-(a.updatedTs||0));
+  let html = '<button class="btn primary" id="addOpp">+ Додати суперника</button>';
+  if(!opps.length){
+    html += '<p class="muted" style="margin-top:14px">Поки немає збережених суперників. Додай при записі результату матчу — познач «Зберегти суперника», і наступного разу достатньо буде обрати його зі списку.</p>';
+  } else {
+    opps.forEach(o=>{
+      const ms = matchesForOpponent(o.id);
+      const w = ms.filter(x=>x.win===true).length, l = ms.filter(x=>x.win===false).length;
+      html += '<div class="card" style="cursor:pointer;margin-top:10px" data-href="#/opponent/'+o.id+'"><div class="row">' +
+        '<div class="grow"><b>'+esc(o.name)+'</b><div class="muted small">'+ms.length+" матч(ів)"+(ms.length? " · останній "+esc(fmtDate(ms[0].date||"")):"")+"</div></div>" +
+        (ms.length? '<span class="badge">'+w+"–"+l+"</span>":"") +
+      "</div></div>";
+    });
+  }
+  $("#app").innerHTML = html;
+  $("#addOpp").onclick = ()=>nav("#/opponentnew");
+  $$("[data-href]").forEach(el=>el.onclick=()=>nav(el.dataset.href));
+}
+
+function scrOpponentForm(opp){
+  const isNew = !opp; opp = opp || {};
+  setTop(isNew? "Новий суперник":"Редагувати суперника", true);
+  $("#app").innerHTML =
+    '<div class="card">' +
+      '<div class="field"><label>Ім’я (або ім’я + прізвище)</label><input class="input" id="o_name" maxlength="60" value="'+esc(opp.name)+'" placeholder="напр., Андрій К."></div>' +
+      '<div class="field"><label>Нотатки: стиль, сильні/слабкі сторони</label><textarea class="input" id="o_notes" maxlength="400" placeholder="напр., лівша, потужний форхенд, слабка друга подача">'+esc(opp.notes)+"</textarea></div>" +
+    "</div>" +
+    '<button class="btn primary" id="oSave">'+(isNew?"Зберегти суперника":"Зберегти зміни")+"</button>" +
+    (isNew? "" : '<button class="btn outline-danger" style="margin-top:10px" id="oDel">Видалити суперника</button>');
+  $("#oSave").onclick = ()=>{
+    const name = val("o_name");
+    if(!name){ toast("Вкажи ім’я суперника"); return; }
+    if(isNew){
+      const dup = (S.opponents||[]).find(x=>x.name.trim().toLowerCase()===name.trim().toLowerCase());
+      if(dup){ toast("Суперник із таким іменем уже є — відкриваю його"); nav("#/opponent/"+dup.id); return; }
+      const no = {id:uid(), name, notes:val("o_notes"), createdTs:Date.now(), updatedTs:Date.now()};
+      S.opponents = S.opponents||[]; S.opponents.push(no); save(); toast("Суперника збережено");
+      nav("#/opponent/"+no.id);
+    } else {
+      opp.name = name; opp.notes = val("o_notes"); opp.updatedTs = Date.now();
+      save(); toast("Оновлено"); nav("#/opponent/"+opp.id);
+    }
+  };
+  const del = $("#oDel");
+  if(del) del.onclick = ()=>{
+    if(confirm("Видалити цього суперника? Записи матчів залишаться, але без прив’язки.")){
+      S.opponents = S.opponents.filter(x=>x.id!==opp.id); save(); nav("#/opponents");
+    }
+  };
+}
+
+function scrOpponentView(opp){
+  setTop(opp.name, true);
+  const ms = matchesForOpponent(opp.id);
+  const w = ms.filter(x=>x.win===true).length, l = ms.filter(x=>x.win===false).length;
+  const notesLog = ms.filter(x=>x.oppStyle).map(x=>({date:x.date||"", txt:x.oppStyle}));
+  let html = '<div class="card accent"><h2>'+esc(opp.name)+"</h2>" +
+    (ms.length? '<p class="muted small">'+ms.length+" матч(ів) · "+w+" перемог · "+l+" поразок</p>" : '<p class="muted small">Матчів ще не записано</p>') +
+    "</div>";
+  html += '<div class="card"><h2>Нотатки</h2><p class="muted small">'+(opp.notes? esc(opp.notes) : "Ще не додано")+"</p></div>";
+  if(notesLog.length){
+    html += '<div class="card"><h2>Історія спостережень по матчах</h2>' +
+      notesLog.map(n=>'<p class="muted small">'+(n.date? "<b>"+esc(fmtDate(n.date))+":</b> ":"")+esc(n.txt)+"</p>").join("") +
+    "</div>";
+  }
+  if(ms.length){
+    html += '<div class="card"><h2>Матчі</h2>';
+    ms.forEach(m=>{
+      const where = m._kind==="tournament" ? "Турнір: "+esc(m._tName||"") : ({sparring:"Спаринг",friendly:"Товариська",league:"Ліга"}[m.type]||"Матч");
+      const href = m._kind==="tournament" ? "#/t/"+m._tId+"/report" : "#/matchview/"+m.id;
+      html += '<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer" data-href="'+href+'">' +
+        '<div class="grow"><b>'+where+'</b><div class="muted small">'+esc(fmtDate(m.date||""))+(m.score? " · "+esc(m.score):"")+"</div></div>" +
+        '<span class="badge '+(m.win?"lime":"red")+'">'+(m.win?"В":"П")+"</span></div>";
+    });
+    html += "</div>";
+  }
+  html += '<button class="btn ghost" id="editOpp">Редагувати</button>';
+  $("#app").innerHTML = html;
+  $("#editOpp").onclick = ()=>nav("#/opponentedit/"+opp.id);
+  $$("[data-href]").forEach(el=>el.onclick=()=>nav(el.dataset.href));
 }
 
 /* ============================================================
@@ -1355,7 +1553,10 @@ function scrProfileEdit(){
 
     '<div class="card"><h2>Досвід і рівень</h2>' +
       '<div class="grid2">' +
-        '<div class="field"><label>Років у тенісі</label><input class="input" id="f_years" type="number" min="0" max="80" inputmode="numeric" value="'+esc(p.years)+'"></div>' +
+        '<div class="field"><label>Стаж у тенісі</label><div style="display:flex;gap:8px">' +
+          '<input class="input" id="f_years" type="number" min="0" max="80" inputmode="numeric" value="'+esc(p.years)+'" placeholder="років">' +
+          '<input class="input" id="f_months" type="number" min="0" max="11" inputmode="numeric" value="'+esc(p.months)+'" placeholder="міс.">' +
+        "</div><div class=\"hint\">Граєш менше року? Заповни лише місяці.</div></div>" +
         '<div class="field"><label>Граю зазвичай</label><select class="input" id="f_freq">'+
           ["","Рідше 1 разу/тижд","1–2 рази/тижд","3+ рази/тижд"].map(o=>'<option value="'+o+'"'+(p.freq===o?" selected":"")+">"+(o||"—")+"</option>").join("")+"</select></div>" +
       "</div>" +
@@ -1477,7 +1678,7 @@ function scrProfileEdit(){
     const firstSave = !S.profile;
     S.profile = {
       name:val("f_name"), age:num("f_age"), sex:val("f_sex"), height:num("f_h"), weight:num("f_w"),
-      hand:chipVal("f_hand")||"", years:num("f_years"), freq:val("f_freq"), level:val("f_level"), rating:val("f_rating"),
+      hand:chipVal("f_hand")||"", years:num("f_years"), months:num("f_months"), freq:val("f_freq"), level:val("f_level"), rating:val("f_rating"),
       racket:{ weight:num("rk_weight"), headSize:num("rk_head"), grip:chipVal("rk_grip")||"", balance:chipVal("rk_balance")||"", pattern:chipVal("rk_pattern")||"" },
       skills: draftSkills,
       style: chipVal("f_style")||"", tendencies: multiChipVal("f_tendency"), selfDesc:val("f_desc"),
@@ -1487,6 +1688,7 @@ function scrProfileEdit(){
       foodTags: multiChipVal("f_foodtags"), foodNotes:val("f_food"),
       morningEnergy:chipVal("f_morning")||"", nerves:chipVal("f_nerves")||""
     };
+    recordSkillSnapshot(draftSkills);
     save(); toast("Профіль збережено");
     nav(firstSave? "#/strengths" : "#/profile");
   };
@@ -1497,12 +1699,15 @@ function scrStrengths(){
   const p = S.profile; if(!p) return nav("#/profile");
   setTop("Твої сильні сторони", true);
   const strong = strongSkills(p);
+  const noStrength = !hasStrength(p);
   $("#app").innerHTML =
     '<div class="progress"><i style="width:100%"></i></div>' +
-    '<div class="card accent"><h2>Ось від чого будуватимемо тактику</h2>' +
+    '<div class="card accent"><h2>'+(noStrength? "Поки твої відносно сильніші сторони":"Ось від чого будуватимемо тактику")+'</h2>' +
       '<div class="chips" style="margin:10px 0">' + strong.map(s=>'<button type="button" class="on" style="pointer-events:none">'+esc(s.label)+" · "+s.v+"/5</button>").join("") + "</div>" +
       (p.selfDesc? '<p class="muted small">Ти про себе: «'+esc(p.selfDesc)+'»</p>' : "") +
-      '<p class="muted">План А завжди спирається на удари з оцінкою 4–5. Слабші удари не стануть опорою тактики.</p>' +
+      (noStrength
+        ? '<p class="muted">Жоден удар ще не на рівні 4–5, тому План А буде обережним і орієнтовним — головне зараз тренувати саме ці удари, а не покладатись на них як на готову зброю.</p>'
+        : '<p class="muted">План А спирається на удари з оцінкою 4–5. Слабші удари не стануть опорою тактики.</p>') +
     "</div>" +
     '<button class="btn primary" id="ok">Усе так, продовжити</button>' +
     '<button class="btn ghost" style="margin-top:10px" id="fix">Виправити оцінки</button>';
@@ -1649,8 +1854,11 @@ function tabGame(t, el){
   const A = genPlanA(p), B = genPlanB(p,t), MG = genMicroGoals(p);
   const W = genWarmup(p,t);
   const rkTip = racketInsight(p);
+  const noStrength = !hasStrength(p);
   let html =
-    '<div class="card accent"><h2>🅰️ План А — твоя гра</h2><p class="muted small">Від ударів, у яких ти впевнений'+(S.profile&&S.profile.name?", "+esc(S.profile.name):"")+".</p><ul class=\"clean\">" +
+    '<div class="card accent"><h2>🅰️ План А — твоя гра</h2><p class="muted small">Від ударів, у яких ти впевнений'+(S.profile&&S.profile.name?", "+esc(S.profile.name):"")+".</p>" +
+    (noStrength? '<p class="muted small" style="color:var(--warn)">Поки жоден удар не оцінений на 4–5 — нижче твої відносно сильніші сторони на сьогодні, а не готова зброя. Тренуй їх далі, а в грі не форсуй.</p>' : "") +
+    "<ul class=\"clean\">" +
     A.map(x=>"<li>"+esc(x.txt)+"</li>").join("") + (rkTip? "<li>"+esc(rkTip.txt)+"</li>" : "") + "</ul></div>" +
 
     '<div class="card"><h2>🅱️ План Б — якщо не йде</h2><p class="muted small">Коли План А не приносить очок 3–4 гейми поспіль.</p><ul class="clean">' +
@@ -1724,7 +1932,7 @@ function scrMatchForm(t){
         '<div class="field"><label>Рахунок</label><input class="input" id="m_score" maxlength="20" placeholder="напр., 6:4" inputmode="numeric"></div>' +
         '<div class="field"><label>Тривалість, хв</label><input class="input" id="m_dur" type="number" min="10" max="240" inputmode="numeric" placeholder="60"></div>' +
       "</div>" +
-      '<div class="field"><label>Суперник (ім’я/псевдонім, опційно)</label><input class="input" id="m_opp" maxlength="40"></div>' +
+      opponentPickerHTML("m_opp","m_oppsave") +
     "</div>" +
 
     '<div class="card"><h2>План і стан</h2>' +
@@ -1748,12 +1956,14 @@ function scrMatchForm(t){
     '<button class="btn primary" id="mSave">Зберегти матч</button>';
 
   bindPickers();
+  bindOpponentPicker("m_opp");
   $("#mSave").onclick = ()=>{
     const winV = chipVal("m_win");
     if(!winV){ toast("Познач: перемога чи поразка"); return; }
     const br = chipVal("m_break");
+    const opponentId = resolveOpponent("m_opp","m_oppsave");
     const m = {
-      id:uid(), ts:Date.now(), win:winV==="w", score:val("m_score"), durMin:num("m_dur"), opponent:val("m_opp"),
+      id:uid(), ts:Date.now(), win:winV==="w", score:val("m_score"), durMin:num("m_dur"), opponent:val("m_opp"), opponentId,
       planScore:segVal("m_plan"), energy:segVal("m_energy"), hydration:segVal("m_hyd"),
       fatigue:segVal("m_fat"), mood:segVal("m_mood"),
       worked:val("m_worked"), failed:val("m_failed"), note:val("m_note"), oppStyle:val("m_oppstyle"),
