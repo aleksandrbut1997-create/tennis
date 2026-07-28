@@ -448,6 +448,7 @@ const RACKET_GRIPS = [
 
 /* ---------- Окремі матчі (поза турніром) ---------- */
 const MATCH_TYPES = [{v:"sparring",label:"Спаринг"},{v:"friendly",label:"Товариська"},{v:"league",label:"Ліга/чемпіонат"}];
+const MATCH_FORMATS = [{v:"singles",label:"Одиночна"},{v:"doubles",label:"Парна"}];
 
 /* ---------- Тренування ---------- */
 const TRAIN_FORMAT = [{v:"group",label:"Групове"},{v:"individual",label:"Індивідуальне"}];
@@ -1049,10 +1050,15 @@ function scrStandaloneMatchForm(){
     '<div class="card"><h2>Гра</h2>' +
       '<div class="field"><label>Дата</label><input class="input" id="m_date" type="date" value="'+todayISO()+'"></div>' +
       '<div class="field"><label>Тип</label>'+chipsInput("m_type", MATCH_TYPES, "sparring")+"</div>" +
+      '<div class="field"><label>Формат</label>'+chipsInput("m_format", MATCH_FORMATS, "singles")+"</div>" +
       '<div class="field"><label>Покриття</label><select class="input" id="m_surface">'+
         SURFACES.map(o=>'<option'+(o==="Хард"?" selected":"")+">"+o+"</option>").join("")+"</select></div>" +
       opponentPickerHTML("m_opp","m_oppsave") +
       '<div class="field"><label>Про суперника: стиль, сильні/слабкі сторони</label><input class="input" id="m_oppstyle" maxlength="200" placeholder="напр., слабкий бекхенд, часто йде до сітки"></div>' +
+      '<div id="doublesFields" style="display:none">' +
+        '<div class="field"><label>Партнер (ім’я, опційно)</label><input class="input" id="m_partner" maxlength="60"></div>' +
+        opponentPickerHTML("m_opp2","m_oppsave2","","Суперник 2 (парна, опційно)") +
+      "</div>" +
     "</div>" +
     '<div class="card"><h2>Результат</h2>' +
       '<div class="field"><label>Підсумок</label>'+chipsInput("m_win",[{v:"w",label:"Перемога 🏆"},{v:"l",label:"Поразка"}],"")+"</div>" +
@@ -1077,14 +1083,23 @@ function scrStandaloneMatchForm(){
 
   bindPickers();
   bindOpponentPicker("m_opp");
+  bindOpponentPicker("m_opp2");
+  $("#m_format").addEventListener("click", ()=>{
+    $("#doublesFields").style.display = chipVal("m_format")==="doubles" ? "block" : "none";
+  });
   $("#mSave").onclick = ()=>{
     const winV = chipVal("m_win");
     if(!winV){ toast("Познач: перемога чи поразка"); return; }
+    const format = chipVal("m_format")||"singles";
     const opponentId = resolveOpponent("m_opp","m_oppsave");
+    const opponentId2 = format==="doubles" ? resolveOpponent("m_opp2","m_oppsave2") : null;
     const m = {
       id:uid(), ts:Date.now(), date:val("m_date")||todayISO(), type:chipVal("m_type")||"sparring", surface:val("m_surface"),
+      matchType:format, partner: format==="doubles"? val("m_partner"):"",
       win:winV==="w", score:val("m_score"), durMin:num("m_dur"),
-      opponent:val("m_opp"), opponentId, oppStyle:val("m_oppstyle"),
+      opponent:val("m_opp"), opponentId,
+      opponent2: format==="doubles"? val("m_opp2"):"", opponentId2,
+      oppStyle:val("m_oppstyle"),
       planScore:segVal("m_plan"), energy:segVal("m_energy"), hydration:segVal("m_hyd"),
       fatigue:segVal("m_fat"), mood:segVal("m_mood"),
       worked:val("m_worked"), failed:val("m_failed"), note:val("m_note")
@@ -1099,7 +1114,9 @@ function scrStandaloneMatchView(m){
   const typeLabel = (MATCH_TYPES.find(x=>x.v===m.type)||{}).label || "Матч";
   $("#app").innerHTML =
     '<div class="card '+(m.win?"accent":"")+'"><span class="badge '+(m.win?"lime":"red")+'">'+(m.win?"Перемога":"Поразка")+"</span>" +
-      '<h2 style="margin-top:8px">'+esc(typeLabel)+(m.opponent? " · "+esc(m.opponent):"")+"</h2>" +
+      (m.matchType==="doubles"? '<span class="badge" style="margin-left:6px">Парна</span>':"") +
+      '<h2 style="margin-top:8px">'+esc(typeLabel)+(m.opponent? " · "+esc(m.opponent):"")+(m.opponent2? " / "+esc(m.opponent2):"")+"</h2>" +
+      (m.matchType==="doubles" && m.partner? '<p class="muted small">Партнер: '+esc(m.partner)+"</p>":"") +
       '<p class="muted small">'+esc(fmtDate(m.date))+(m.surface? " · "+esc(m.surface):"")+(m.durMin? " · "+m.durMin+" хв":"")+"</p>" +
       (m.score? '<p style="font-size:1.3rem;font-weight:800">'+esc(m.score)+"</p>" : "") +
     "</div>" +
@@ -1905,7 +1922,7 @@ function tabMatches(t, el){
     html += '<div class="card matchcard">' +
       '<div class="wl '+(m.win?"w":"l")+'">'+(m.win?"П":"Пр")+"</div>" +
       '<div class="grow"><div class="score">'+esc(m.score||"—")+"</div>" +
-      '<div class="muted small">Матч '+(i+1)+(m.opponent? " · "+esc(m.opponent):"")+(m.durMin? " · "+m.durMin+" хв":"")+"</div></div>" +
+      '<div class="muted small">Матч '+(i+1)+(m.opponent? " · "+esc(m.opponent):"")+(m.opponent2? "/"+esc(m.opponent2):"")+(m.matchType==="doubles"? " (парна)":"")+(m.durMin? " · "+m.durMin+" хв":"")+"</div></div>" +
       (m.planScore? '<span class="badge'+(m.planScore>=4?" ok":"")+'">план '+m.planScore+"/5</span>":"") +
       "</div>";
   });
@@ -1932,7 +1949,12 @@ function scrMatchForm(t){
         '<div class="field"><label>Рахунок</label><input class="input" id="m_score" maxlength="20" placeholder="напр., 6:4" inputmode="numeric"></div>' +
         '<div class="field"><label>Тривалість, хв</label><input class="input" id="m_dur" type="number" min="10" max="240" inputmode="numeric" placeholder="60"></div>' +
       "</div>" +
+      '<div class="field"><label>Формат</label>'+chipsInput("m_format", MATCH_FORMATS, "singles")+"</div>" +
       opponentPickerHTML("m_opp","m_oppsave") +
+      '<div id="doublesFields" style="display:none">' +
+        '<div class="field"><label>Партнер (ім’я, опційно)</label><input class="input" id="m_partner" maxlength="60"></div>' +
+        opponentPickerHTML("m_opp2","m_oppsave2","","Суперник 2 (парна, опційно)") +
+      "</div>" +
     "</div>" +
 
     '<div class="card"><h2>План і стан</h2>' +
@@ -1957,13 +1979,22 @@ function scrMatchForm(t){
 
   bindPickers();
   bindOpponentPicker("m_opp");
+  bindOpponentPicker("m_opp2");
+  $("#m_format").addEventListener("click", ()=>{
+    $("#doublesFields").style.display = chipVal("m_format")==="doubles" ? "block" : "none";
+  });
   $("#mSave").onclick = ()=>{
     const winV = chipVal("m_win");
     if(!winV){ toast("Познач: перемога чи поразка"); return; }
     const br = chipVal("m_break");
+    const format = chipVal("m_format")||"singles";
     const opponentId = resolveOpponent("m_opp","m_oppsave");
+    const opponentId2 = format==="doubles" ? resolveOpponent("m_opp2","m_oppsave2") : null;
     const m = {
-      id:uid(), ts:Date.now(), win:winV==="w", score:val("m_score"), durMin:num("m_dur"), opponent:val("m_opp"), opponentId,
+      id:uid(), ts:Date.now(), win:winV==="w", score:val("m_score"), durMin:num("m_dur"),
+      matchType:format, partner: format==="doubles"? val("m_partner"):"",
+      opponent:val("m_opp"), opponentId,
+      opponent2: format==="doubles"? val("m_opp2"):"", opponentId2,
       planScore:segVal("m_plan"), energy:segVal("m_energy"), hydration:segVal("m_hyd"),
       fatigue:segVal("m_fat"), mood:segVal("m_mood"),
       worked:val("m_worked"), failed:val("m_failed"), note:val("m_note"), oppStyle:val("m_oppstyle"),
